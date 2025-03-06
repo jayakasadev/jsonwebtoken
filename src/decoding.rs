@@ -1,16 +1,15 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
-use serde::de::DeserializeOwned;
-
 use crate::algorithms::AlgorithmFamily;
 use crate::crypto::verify;
 use crate::errors::{new_error, ErrorKind, Result};
-use crate::header::Header;
+use crate::header::{from_encoded, Header};
 use crate::jwk::{AlgorithmParameters, Jwk};
 #[cfg(feature = "use_pem")]
 use crate::pem::decoder::PemEncodedKey;
 use crate::serialization::{b64_decode, DecodedJwtPartClaims};
 use crate::validation::{validate, Validation};
 use crate::BaseHeader;
+use base64::{engine::general_purpose::STANDARD, Engine};
+use serde::de::DeserializeOwned;
 
 /// The return type of a successful call to [decode](fn.decode.html).
 #[derive(Debug)]
@@ -206,7 +205,7 @@ impl DecodingKey {
 /// Verify signature of a JWT, and return header object and raw payload
 ///
 /// If the token or its signature is invalid, it will return an error.
-fn verify_signature<'a, H: BaseHeader>(
+fn verify_signature<'a, H: BaseHeader + DeserializeOwned>(
     token: &'a str,
     key: &DecodingKey,
     validation: &Validation,
@@ -225,7 +224,7 @@ fn verify_signature<'a, H: BaseHeader>(
 
     let (signature, message) = expect_two!(token.rsplitn(2, '.'));
     let (payload, header) = expect_two!(message.rsplitn(2, '.'));
-    let header = H::from_encoded(header)?;
+    let header: H = from_encoded(header)?;
 
     let alg = header.get_algorithm();
     if validation.validate_signature && !validation.algorithms.contains(&alg) {
@@ -257,7 +256,7 @@ fn verify_signature<'a, H: BaseHeader>(
 /// // Claims is a struct that implements Deserialize
 /// let token_message = decode::<Header, Claims>(&token, &DecodingKey::from_secret("secret".as_ref()), &Validation::new(Algorithm::HS256));
 /// ```
-pub fn decode<H: BaseHeader, T: DeserializeOwned>(
+pub fn decode<H: BaseHeader + DeserializeOwned, T: DeserializeOwned>(
     token: &str,
     key: &DecodingKey,
     validation: &Validation,
@@ -287,5 +286,5 @@ pub fn decode<H: BaseHeader, T: DeserializeOwned>(
 pub fn decode_header(token: &str) -> Result<Header> {
     let (_, message) = expect_two!(token.rsplitn(2, '.'));
     let (_, header) = expect_two!(message.rsplitn(2, '.'));
-    Header::from_encoded(header)
+    from_encoded(header)
 }

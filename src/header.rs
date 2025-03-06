@@ -1,21 +1,17 @@
 use std::result;
 
-use base64::{engine::general_purpose::STANDARD, Engine};
-use serde::{Deserialize, Serialize};
-
 use crate::algorithms::Algorithm;
 use crate::errors::Result;
 use crate::jwk::Jwk;
 use crate::serialization::b64_decode;
+use base64::{engine::general_purpose::STANDARD, Engine};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 /// A basic trait defining the required functionality for a Header type
 pub trait BaseHeader {
     /// Returns the Algorithm type
     fn get_algorithm(&self) -> Algorithm;
-    /// Converts an encoded part into the Header struct if possible
-    fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self>
-    where
-        Self: Sized;
 }
 
 /// A basic JWT header, the alg defaults to HS256 and typ is automatically
@@ -109,11 +105,11 @@ impl BaseHeader for Header {
     fn get_algorithm(&self) -> Algorithm {
         self.alg
     }
+}
 
-    fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self> {
-        let decoded = b64_decode(encoded_part)?;
-        Ok(serde_json::from_slice(&decoded)?)
-    }
+pub fn from_encoded<T: AsRef<[u8]>, H: DeserializeOwned>(encoded_part: T) -> Result<H> {
+    let decoded = b64_decode(encoded_part)?;
+    Ok(serde_json::from_slice(&decoded)?)
 }
 
 impl Default for Header {
