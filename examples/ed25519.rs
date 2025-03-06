@@ -1,5 +1,5 @@
 use jsonwebtoken::{
-    decode, encode, get_current_timestamp, Algorithm, DecodingKey, EncodingKey, Validation,
+    decode, encode, get_current_timestamp, Algorithm, DecodingKey, EncodingKey, Header, Validation,
 };
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ fn main() {
         encode(&jsonwebtoken::Header::new(Algorithm::EdDSA), &claims, &encoding_key).unwrap();
 
     let validation = Validation::new(Algorithm::EdDSA);
-    let _token_data = decode::<Claims>(&token, &decoding_key, &validation).unwrap();
+    let _token_data = decode::<Header, Claims>(&token, &decoding_key, &validation).unwrap();
 }
 
 #[cfg(test)]
@@ -56,7 +56,7 @@ mod tests {
                 .unwrap();
 
         let validation = Validation::new(Algorithm::EdDSA);
-        let token_data = decode::<Claims>(&token, &jot.decoding_key, &validation).unwrap();
+        let token_data = decode::<Header, Claims>(&token, &jot.decoding_key, &validation).unwrap();
         assert_eq!(token_data.claims.sub, "test");
     }
 }

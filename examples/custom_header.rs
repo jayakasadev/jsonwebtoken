@@ -32,7 +32,7 @@ fn main() {
     };
     println!("{:?}", token);
 
-    let token_data = match decode::<Claims>(
+    let token_data = match decode::<Header, Claims>(
         &token,
         &DecodingKey::from_secret(key),
         &Validation::new(Algorithm::HS512),

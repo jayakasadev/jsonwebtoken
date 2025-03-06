@@ -4,7 +4,7 @@ use serde::ser::Serialize;
 use crate::algorithms::AlgorithmFamily;
 use crate::crypto;
 use crate::errors::{new_error, ErrorKind, Result};
-use crate::header::Header;
+use crate::header::BaseHeader;
 #[cfg(feature = "use_pem")]
 use crate::pem::decoder::PemEncodedKey;
 use crate::serialization::b64_encode_part;
@@ -118,14 +118,19 @@ impl EncodingKey {
 /// // This will create a JWT using HS256 as algorithm
 /// let token = encode(&Header::default(), &my_claims, &EncodingKey::from_secret("secret".as_ref())).unwrap();
 /// ```
-pub fn encode<T: Serialize>(header: &Header, claims: &T, key: &EncodingKey) -> Result<String> {
-    if key.family != header.alg.family() {
+pub fn encode<H: BaseHeader + Serialize, T: Serialize>(
+    header: &H,
+    claims: &T,
+    key: &EncodingKey,
+) -> Result<String> {
+    let alg = header.get_algorithm();
+    if key.family != alg.family() {
         return Err(new_error(ErrorKind::InvalidAlgorithm));
     }
     let encoded_header = b64_encode_part(header)?;
     let encoded_claims = b64_encode_part(claims)?;
     let message = [encoded_header, encoded_claims].join(".");
-    let signature = crypto::sign(message.as_bytes(), key, header.alg)?;
+    let signature = crypto::sign(message.as_bytes(), key, alg)?;
 
     Ok([message, signature].join("."))
 }

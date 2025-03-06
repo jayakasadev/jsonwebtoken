@@ -122,7 +122,7 @@ fn round_trip_claim() {
         let token =
             encode(&Header::new(alg), &my_claims, &EncodingKey::from_rsa_pem(privkey_pem).unwrap())
                 .unwrap();
-        let token_data = decode::<Claims>(
+        let token_data = decode::<Header, Claims>(
             &token,
             &DecodingKey::from_rsa_pem(pubkey_pem).unwrap(),
             &Validation::new(alg),
@@ -131,7 +131,7 @@ fn round_trip_claim() {
         assert_eq!(my_claims, token_data.claims);
         assert!(token_data.header.kid.is_none());
 
-        let cert_token_data = decode::<Claims>(
+        let cert_token_data = decode::<Header, Claims>(
             &token,
             &DecodingKey::from_rsa_pem(certificate_pem).unwrap(),
             &Validation::new(alg),
@@ -161,7 +161,7 @@ fn rsa_modulus_exponent() {
         &EncodingKey::from_rsa_pem(privkey.as_ref()).unwrap(),
     )
     .unwrap();
-    let res = decode::<Claims>(
+    let res = decode::<Header, Claims>(
         &encrypted,
         &DecodingKey::from_rsa_components(n, e).unwrap(),
         &Validation::new(Algorithm::RS256),
@@ -197,7 +197,7 @@ fn rsa_jwk() {
         &EncodingKey::from_rsa_pem(privkey.as_ref()).unwrap(),
     )
     .unwrap();
-    let res = decode::<Claims>(
+    let res = decode::<Header, Claims>(
         &encrypted,
         &DecodingKey::from_jwk(&jwk).unwrap(),
         &Validation::new(Algorithm::RS256),
@@ -225,7 +225,7 @@ fn roundtrip_with_jwtio_example_jey() {
             encode(&Header::new(alg), &my_claims, &EncodingKey::from_rsa_pem(privkey_pem).unwrap())
                 .unwrap();
 
-        let token_data = decode::<Claims>(
+        let token_data = decode::<Header, Claims>(
             &token,
             &DecodingKey::from_rsa_pem(pubkey_pem).unwrap(),
             &Validation::new(alg),
@@ -233,7 +233,7 @@ fn roundtrip_with_jwtio_example_jey() {
         .unwrap();
         assert_eq!(my_claims, token_data.claims);
 
-        let cert_token_data = decode::<Claims>(
+        let cert_token_data = decode::<Header, Claims>(
             &token,
             &DecodingKey::from_rsa_pem(certificate_pem).unwrap(),
             &Validation::new(alg),

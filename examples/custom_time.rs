@@ -82,7 +82,7 @@ mod jwt_numeric_date {
 
             assert_eq!(&token, EXPECTED_TOKEN);
 
-            let decoded = decode::<Claims>(
+            let decoded = decode::<Header, Claims>(
                 &token,
                 &DecodingKey::from_secret(SECRET.as_ref()),
                 &Validation::new(Algorithm::HS256),
@@ -97,7 +97,7 @@ mod jwt_numeric_date {
             // A token with the expiry of i64::MAX + 1
             let overflow_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJDdXN0b20gRGF0ZVRpbWUgc2VyL2RlIiwiaWF0IjowLCJleHAiOjkyMjMzNzIwMzY4NTQ3NzYwMDB9.G2PKreA27U8_xOwuIeCYXacFYeR46f9FyENIZfCrvEc";
 
-            let decode_result = decode::<Claims>(
+            let decode_result = decode::<Header, Claims>(
                 &overflow_token,
                 &DecodingKey::from_secret(SECRET.as_ref()),
                 &Validation::new(Algorithm::HS256),
@@ -118,7 +118,7 @@ mod jwt_numeric_date {
                 encode(&Header::default(), &claims, &EncodingKey::from_secret(SECRET.as_ref()))
                     .expect("Failed to encode claims");
 
-            let decoded = decode::<Claims>(
+            let decoded = decode::<Header, Claims>(
                 &token,
                 &DecodingKey::from_secret(SECRET.as_ref()),
                 &Validation::new(Algorithm::HS256),
@@ -146,7 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("serialized token: {}", &token);
 
-    let token_data = jsonwebtoken::decode::<Claims>(
+    let token_data = jsonwebtoken::decode::<Header, Claims>(
         &token,
         &DecodingKey::from_secret(SECRET.as_ref()),
         &Validation::new(Algorithm::HS256),

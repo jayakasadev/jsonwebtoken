@@ -67,7 +67,7 @@ fn round_trip_claim() {
         &EncodingKey::from_ed_pem(privkey_pem).unwrap(),
     )
     .unwrap();
-    let token_data = decode::<Claims>(
+    let token_data = decode::<Header, Claims>(
         &token,
         &DecodingKey::from_ed_pem(pubkey_pem).unwrap(),
         &Validation::new(Algorithm::EdDSA),
@@ -94,7 +94,7 @@ fn ed_x() {
         &EncodingKey::from_ed_pem(privkey.as_ref()).unwrap(),
     )
     .unwrap();
-    let res = decode::<Claims>(
+    let res = decode::<Header, Claims>(
         &encrypted,
         &DecodingKey::from_ed_components(x).unwrap(),
         &Validation::new(Algorithm::EdDSA),
@@ -131,7 +131,7 @@ fn ed_jwk() {
         &EncodingKey::from_ed_pem(privkey.as_ref()).unwrap(),
     )
     .unwrap();
-    let res = decode::<Claims>(
+    let res = decode::<Header, Claims>(
         &encrypted,
         &DecodingKey::from_jwk(&jwk).unwrap(),
         &Validation::new(Algorithm::EdDSA),

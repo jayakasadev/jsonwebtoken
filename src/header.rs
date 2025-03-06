@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::result;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -8,6 +7,16 @@ use crate::algorithms::Algorithm;
 use crate::errors::Result;
 use crate::jwk::Jwk;
 use crate::serialization::b64_decode;
+
+/// A basic trait defining the required functionality for a Header type
+pub trait BaseHeader {
+    /// Returns the Algorithm type
+    fn get_algorithm(&self) -> Algorithm;
+    /// Converts an encoded part into the Header struct if possible
+    fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self>
+    where
+        Self: Sized;
+}
 
 /// A basic JWT header, the alg defaults to HS256 and typ is automatically
 /// set to `JWT`. All the other fields are optional.
@@ -65,12 +74,6 @@ pub struct Header {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "x5t#S256")]
     pub x5t_s256: Option<String>,
-
-    /// Any additional non-standard headers not defined in [RFC7515#4.1](https://datatracker.ietf.org/doc/html/rfc7515#section-4.1).
-    /// Once serialized, all keys will be converted to fields at the root level of the header payload
-    /// Ex: Dict("custom" -> "header") will be converted to "{"typ": "JWT", ..., "custom": "header"}"
-    #[serde(flatten)]
-    pub extras: HashMap<String, String>,
 }
 
 impl Header {
@@ -87,14 +90,7 @@ impl Header {
             x5c: None,
             x5t: None,
             x5t_s256: None,
-            extras: Default::default(),
         }
-    }
-
-    /// Converts an encoded part into the Header struct if possible
-    pub(crate) fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self> {
-        let decoded = b64_decode(encoded_part)?;
-        Ok(serde_json::from_slice(&decoded)?)
     }
 
     /// Decodes the X.509 certificate chain into ASN.1 DER format.
@@ -106,6 +102,17 @@ impl Header {
                 b64_certs.iter().map(|x| STANDARD.decode(x)).collect::<result::Result<_, _>>()
             })
             .transpose()?)
+    }
+}
+
+impl BaseHeader for Header {
+    fn get_algorithm(&self) -> Algorithm {
+        self.alg
+    }
+
+    fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self> {
+        let decoded = b64_decode(encoded_part)?;
+        Ok(serde_json::from_slice(&decoded)?)
     }
 }
 

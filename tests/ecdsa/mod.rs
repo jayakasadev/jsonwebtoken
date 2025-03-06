@@ -67,7 +67,7 @@ fn round_trip_claim() {
         &EncodingKey::from_ec_pem(privkey_pem).unwrap(),
     )
     .unwrap();
-    let token_data = decode::<Claims>(
+    let token_data = decode::<Header, Claims>(
         &token,
         &DecodingKey::from_ec_pem(pubkey_pem).unwrap(),
         &Validation::new(Algorithm::ES256),
@@ -95,7 +95,7 @@ fn ec_x_y() {
         &EncodingKey::from_ec_pem(privkey.as_ref()).unwrap(),
     )
     .unwrap();
-    let res = decode::<Claims>(
+    let res = decode::<Header, Claims>(
         &encrypted,
         &DecodingKey::from_ec_components(x, y).unwrap(),
         &Validation::new(Algorithm::ES256),
@@ -133,7 +133,7 @@ fn ed_jwk() {
         &EncodingKey::from_ec_pem(privkey.as_ref()).unwrap(),
     )
     .unwrap();
-    let res = decode::<Claims>(
+    let res = decode::<Header, Claims>(
         &encrypted,
         &DecodingKey::from_jwk(&jwk).unwrap(),
         &Validation::new(Algorithm::ES256),
@@ -160,7 +160,7 @@ fn roundtrip_with_jwtio_example() {
         &EncodingKey::from_ec_pem(privkey_pem).unwrap(),
     )
     .unwrap();
-    let token_data = decode::<Claims>(
+    let token_data = decode::<Header, Claims>(
         &token,
         &DecodingKey::from_ec_pem(pubkey_pem).unwrap(),
         &Validation::new(Algorithm::ES384),

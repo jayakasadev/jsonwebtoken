@@ -36,7 +36,7 @@ fn bench_decode(c: &mut Criterion) {
 
     c.bench_function("bench_decode", |b| {
         b.iter(|| {
-            decode::<Claims>(
+            decode::<Header, Claims>(
                 black_box(token),
                 black_box(&key),
                 black_box(&Validation::new(Algorithm::HS256)),

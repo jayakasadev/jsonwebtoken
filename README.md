@@ -112,7 +112,7 @@ something similar and reuse it.
 
 ```rust
 // `token` is a struct with 2 fields: `header` and `claims` where `claims` is your own struct.
-let token = decode::<Claims>(&token, &DecodingKey::from_secret("secret".as_ref()), &Validation::default())?;
+let token = decode::<Header, Claims>(&token, &DecodingKey::from_secret("secret".as_ref()), &Validation::default())?;
 ```
 `decode` can result in errors for a variety of reasons:
 
@@ -145,7 +145,7 @@ The main use-case is for JWK where your public key is in a JSON format like so:
 
 ```rust
 // `token` is a struct with 2 fields: `header` and `claims` where `claims` is your own struct.
-let token = decode::<Claims>(&token, &DecodingKey::from_rsa_components(jwk["n"], jwk["e"]), &Validation::new(Algorithm::RS256))?;
+let token = decode::<Header, Claims>(&token, &DecodingKey::from_rsa_components(jwk["n"], jwk["e"]), &Validation::new(Algorithm::RS256))?;
 ```
 
 If your key is in PEM format, it is better performance wise to generate the `DecodingKey` once in a `lazy_static` or
