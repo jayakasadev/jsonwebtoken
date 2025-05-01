@@ -1,13 +1,14 @@
+use alloc::vec::Vec;
 use crate::algorithms::AlgorithmFamily;
 use crate::crypto::verify;
 use crate::errors::{new_error, ErrorKind, Result};
-use crate::header::{from_encoded, Header};
+use crate::header::from_encoded;
 use crate::jwk::{AlgorithmParameters, Jwk};
 #[cfg(feature = "use_pem")]
 use crate::pem::decoder::PemEncodedKey;
 use crate::serialization::{b64_decode, DecodedJwtPartClaims};
 use crate::validation::{validate, Validation};
-use crate::BaseHeader;
+use crate::GetHeader;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::de::DeserializeOwned;
 
@@ -205,7 +206,7 @@ impl DecodingKey {
 /// Verify signature of a JWT, and return header object and raw payload
 ///
 /// If the token or its signature is invalid, it will return an error.
-fn verify_signature<'a, H: BaseHeader + DeserializeOwned>(
+fn verify_signature<'a, H: GetHeader + DeserializeOwned>(
     token: &'a str,
     key: &DecodingKey,
     validation: &Validation,
@@ -226,7 +227,7 @@ fn verify_signature<'a, H: BaseHeader + DeserializeOwned>(
     let (payload, header) = expect_two!(message.rsplitn(2, '.'));
     let header: H = from_encoded(header)?;
 
-    let alg = header.get_algorithm();
+    let alg = header.get_header().alg;
     if validation.validate_signature && !validation.algorithms.contains(&alg) {
         return Err(new_error(ErrorKind::InvalidAlgorithm));
     }
@@ -244,7 +245,7 @@ fn verify_signature<'a, H: BaseHeader + DeserializeOwned>(
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
-/// use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, Header};
+/// use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, Header, GetHeader};
 ///
 /// #[derive(Debug, Serialize, Deserialize)]
 /// struct Claims {
@@ -256,7 +257,7 @@ fn verify_signature<'a, H: BaseHeader + DeserializeOwned>(
 /// // Claims is a struct that implements Deserialize
 /// let token_message = decode::<Header, Claims>(&token, &DecodingKey::from_secret("secret".as_ref()), &Validation::new(Algorithm::HS256));
 /// ```
-pub fn decode<H: BaseHeader + DeserializeOwned, T: DeserializeOwned>(
+pub fn decode<H: GetHeader + DeserializeOwned, T: DeserializeOwned>(
     token: &str,
     key: &DecodingKey,
     validation: &Validation,
@@ -278,12 +279,13 @@ pub fn decode<H: BaseHeader + DeserializeOwned, T: DeserializeOwned>(
 /// If the token has an invalid format (ie 3 parts separated by a `.`), it will return an error.
 ///
 /// ```rust
-/// use jsonwebtoken::decode_header;
+/// use jsonwebtoken::{decode_header, Header};
+/// use jsonwebtoken::errors::Error;
 ///
 /// let token = "a.jwt.token".to_string();
-/// let header = decode_header(&token);
+/// let header: Result<Header,Error> = decode_header(&token);
 /// ```
-pub fn decode_header(token: &str) -> Result<Header> {
+pub fn decode_header<H: GetHeader + DeserializeOwned>(token: &str) -> Result<H> {
     let (_, message) = expect_two!(token.rsplitn(2, '.'));
     let (_, header) = expect_two!(message.rsplitn(2, '.'));
     from_encoded(header)

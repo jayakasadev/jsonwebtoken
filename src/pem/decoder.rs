@@ -1,3 +1,5 @@
+use alloc::vec;
+use alloc::vec::Vec;
 use crate::errors::{ErrorKind, Result};
 
 /// Supported PEM files for EC and RSA Public and Private Keys

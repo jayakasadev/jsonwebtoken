@@ -1,3 +1,4 @@
+use alloc::string::String;
 use ring::constant_time::verify_slices_are_equal;
 use ring::{hmac, signature};
 

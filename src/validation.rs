@@ -1,10 +1,12 @@
-use std::borrow::Cow;
-use std::collections::HashSet;
-use std::fmt;
-use std::marker::PhantomData;
-
+use alloc::borrow::{Cow, ToOwned};
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
+use core::fmt;
+use core::marker::PhantomData;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
+use hashbrown::HashSet;
 
 use crate::algorithms::Algorithm;
 use crate::errors::{new_error, ErrorKind, Result};
@@ -171,8 +173,7 @@ impl Default for Validation {
 #[cfg(not(all(target_arch = "wasm32", not(any(target_os = "emscripten", target_os = "wasi")))))]
 #[must_use]
 pub fn get_current_timestamp() -> u64 {
-    let start = std::time::SystemTime::now();
-    start.duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs()
+    chrono::Utc::now().timestamp() as u64
 }
 
 /// Gets the current timestamp in the format expected by JWTs.
@@ -204,7 +205,7 @@ enum TryParse<T> {
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for TryParse<T> {
     fn deserialize<D: serde::Deserializer<'de>>(
         deserializer: D,
-    ) -> std::result::Result<Self, D::Error> {
+    ) -> core::result::Result<Self, D::Error> {
         Ok(match Option::<T>::deserialize(deserializer) {
             Ok(Some(value)) => TryParse::Parsed(value),
             Ok(None) => TryParse::NotPresent,
@@ -237,7 +238,7 @@ enum Issuer<'a> {
 /// We use this struct in this case.
 #[derive(Deserialize, PartialEq, Eq, Hash)]
 struct BorrowedCowIfPossible<'a>(#[serde(borrow)] Cow<'a, str>);
-impl std::borrow::Borrow<str> for BorrowedCowIfPossible<'_> {
+impl core::borrow::Borrow<str> for BorrowedCowIfPossible<'_> {
     fn borrow(&self) -> &str {
         &self.0
     }
@@ -331,7 +332,7 @@ pub(crate) fn validate(claims: ClaimsForValidation, options: &Validation) -> Res
     Ok(())
 }
 
-fn numeric_type<'de, D>(deserializer: D) -> std::result::Result<TryParse<u64>, D::Error>
+fn numeric_type<'de, D>(deserializer: D) -> core::result::Result<TryParse<u64>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -344,14 +345,14 @@ where
             formatter.write_str("A NumericType that can be reasonably coerced into a u64")
         }
 
-        fn visit_u64<E>(self, value: u64) -> std::result::Result<Self::Value, E>
+        fn visit_u64<E>(self, value: u64) -> core::result::Result<Self::Value, E>
         where
             E: de::Error,
         {
             Ok(TryParse::Parsed(value))
         }
 
-        fn visit_f64<E>(self, value: f64) -> std::result::Result<Self::Value, E>
+        fn visit_f64<E>(self, value: f64) -> core::result::Result<Self::Value, E>
         where
             E: de::Error,
         {
@@ -371,6 +372,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::borrow::ToOwned;
+    use alloc::string::ToString;
+    use hashbrown::HashSet;
     use serde_json::json;
     use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -378,7 +382,6 @@ mod tests {
 
     use crate::errors::ErrorKind;
     use crate::Algorithm;
-    use std::collections::HashSet;
 
     fn deserialize_claims(claims: &serde_json::Value) -> ClaimsForValidation {
         serde::Deserialize::deserialize(claims).unwrap()
@@ -807,7 +810,7 @@ mod tests {
         let claims = json!({"aud": "my-googleclientid1234.apps.googleusercontent.com"});
 
         let aud = "my-googleclientid1234.apps.googleusercontent.com".to_string();
-        let mut aud_hashset = std::collections::HashSet::new();
+        let mut aud_hashset = HashSet::new();
         aud_hashset.insert(aud);
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;

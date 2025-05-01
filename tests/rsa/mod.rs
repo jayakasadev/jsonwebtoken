@@ -129,7 +129,7 @@ fn round_trip_claim() {
         )
         .unwrap();
         assert_eq!(my_claims, token_data.claims);
-        assert!(token_data.header.kid.is_none());
+        assert!(token_data.header.base.kid.is_none());
 
         let cert_token_data = decode::<Header, Claims>(
             &token,
@@ -138,7 +138,7 @@ fn round_trip_claim() {
         )
         .unwrap();
         assert_eq!(my_claims, cert_token_data.claims);
-        assert!(cert_token_data.header.kid.is_none());
+        assert!(cert_token_data.header.base.kid.is_none());
     }
 }
 

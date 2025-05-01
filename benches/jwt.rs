@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use jsonwebtoken::{decode, encode, Algorithm, BaseHeader, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, encode, Algorithm, GetHeader, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -10,18 +10,14 @@ struct Claims {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct CustomHeader {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub typ: Option<String>,
-    pub alg: Algorithm,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kid: Option<String>,
+    pub header: jsonwebtoken::header::BaseHeader,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom: Option<String>,
 }
 
-impl BaseHeader for CustomHeader {
-    fn get_algorithm(&self) -> Algorithm {
-        self.alg
+impl GetHeader for CustomHeader {
+    fn get_header(&self) -> jsonwebtoken::header::BaseHeader {
+        self.header.clone()
     }
 }
 
@@ -39,9 +35,8 @@ fn bench_encode_custom_header(c: &mut Criterion) {
     let key = EncodingKey::from_secret("secret".as_ref());
 
     let header = CustomHeader {
-        kid: Some("kid".to_string()),
+        header: jsonwebtoken::header::BaseHeader::default(),
         custom: Some("header".to_string()),
-        ..Default::default()
     };
 
     c.bench_function("bench_encode", |b| {

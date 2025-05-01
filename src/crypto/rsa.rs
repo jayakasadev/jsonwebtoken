@@ -1,3 +1,5 @@
+use alloc::string::{String, ToString};
+use alloc::vec;
 use ring::{rand, signature};
 
 use crate::algorithms::Algorithm;

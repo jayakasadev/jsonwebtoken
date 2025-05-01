@@ -1,5 +1,6 @@
-use std::result;
-
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::result;
 use crate::algorithms::Algorithm;
 use crate::errors::Result;
 use crate::jwk::Jwk;
@@ -9,15 +10,15 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 /// A basic trait defining the required functionality for a Header type
-pub trait BaseHeader {
-    /// Returns the Algorithm type
-    fn get_algorithm(&self) -> Algorithm;
+pub trait GetHeader {
+    /// Get header
+    fn get_header(&self) -> BaseHeader;
 }
 
 /// A basic JWT header, the alg defaults to HS256 and typ is automatically
 /// set to `JWT`. All the other fields are optional.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Header {
+pub struct BaseHeader {
     /// The type of JWS: it can only be "JWT" here
     ///
     /// Defined in [RFC7515#4.1.9](https://tools.ietf.org/html/rfc7515#section-4.1.9).
@@ -72,10 +73,10 @@ pub struct Header {
     pub x5t_s256: Option<String>,
 }
 
-impl Header {
+impl BaseHeader {
     /// Returns a JWT header with the algorithm given
     pub fn new(algorithm: Algorithm) -> Self {
-        Header {
+        BaseHeader {
             typ: Some("JWT".to_string()),
             alg: algorithm,
             cty: None,
@@ -101,20 +102,43 @@ impl Header {
     }
 }
 
-impl BaseHeader for Header {
-    fn get_algorithm(&self) -> Algorithm {
-        self.alg
+/// A basic container for headers
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Header {
+    /// inner header
+    #[serde(flatten)]
+    pub base: BaseHeader,
+}
+
+impl Header {
+    /// Basic builder
+    pub fn new(algorithm: Algorithm) -> Self {
+        Header{base: BaseHeader::new(algorithm)}
     }
 }
 
+impl GetHeader for Header {
+    fn get_header(&self) -> BaseHeader {
+        self.base.clone()
+    }
+}
+
+/// Decodes a JWT header from a base64 encoded type
 pub fn from_encoded<T: AsRef<[u8]>, H: DeserializeOwned>(encoded_part: T) -> Result<H> {
     let decoded = b64_decode(encoded_part)?;
     Ok(serde_json::from_slice(&decoded)?)
 }
 
+impl Default for BaseHeader {
+    /// Returns a JWT header using the default Algorithm, HS256
+    fn default() -> Self {
+        BaseHeader::new(Algorithm::default())
+    }
+}
+
 impl Default for Header {
     /// Returns a JWT header using the default Algorithm, HS256
     fn default() -> Self {
-        Header::new(Algorithm::default())
+        Header { base: BaseHeader::default() }
     }
 }

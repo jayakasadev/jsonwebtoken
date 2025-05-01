@@ -1,6 +1,6 @@
+use core::str::FromStr;
 use crate::errors::{Error, ErrorKind, Result};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub(crate) enum AlgorithmFamily {

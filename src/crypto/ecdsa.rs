@@ -1,3 +1,4 @@
+use alloc::string::String;
 use ring::{rand, signature};
 
 use crate::algorithms::Algorithm;

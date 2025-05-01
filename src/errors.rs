@@ -1,8 +1,9 @@
-use std::error::Error as StdError;
-use std::fmt;
-use std::result;
-use std::sync::Arc;
-
+use alloc::boxed::Box;
+use alloc::{format, string};
+use alloc::string::String;
+use alloc::sync::Arc;
+use core::error::Error as CoreError;
+use core::{fmt, result};
 /// A crate private constructor for `Error`.
 pub(crate) fn new_error(kind: ErrorKind) -> Error {
     Error(Box::new(kind))
@@ -75,13 +76,13 @@ pub enum ErrorKind {
     /// An error happened while serializing/deserializing JSON
     Json(Arc<serde_json::Error>),
     /// Some of the text was invalid UTF-8
-    Utf8(::std::string::FromUtf8Error),
+    Utf8(string::FromUtf8Error),
     /// Something unspecified went wrong with crypto
     Crypto(::ring::error::Unspecified),
 }
 
-impl StdError for Error {
-    fn cause(&self) -> Option<&dyn StdError> {
+impl CoreError for Error {
+    fn cause(&self) -> Option<&dyn CoreError> {
         match &*self.0 {
             ErrorKind::InvalidToken => None,
             ErrorKind::InvalidSignature => None,
@@ -153,8 +154,8 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<::std::string::FromUtf8Error> for Error {
-    fn from(err: ::std::string::FromUtf8Error) -> Error {
+impl From<string::FromUtf8Error> for Error {
+    fn from(err: string::FromUtf8Error) -> Error {
         new_error(ErrorKind::Utf8(err))
     }
 }
@@ -179,6 +180,7 @@ impl From<ErrorKind> for Error {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
     use wasm_bindgen_test::wasm_bindgen_test;
 
     use super::*;

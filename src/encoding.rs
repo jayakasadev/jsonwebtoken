@@ -1,10 +1,12 @@
+use alloc::string::String;
+use alloc::vec::Vec;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::ser::Serialize;
 
 use crate::algorithms::AlgorithmFamily;
 use crate::crypto;
 use crate::errors::{new_error, ErrorKind, Result};
-use crate::header::BaseHeader;
+use crate::header::GetHeader;
 #[cfg(feature = "use_pem")]
 use crate::pem::decoder::PemEncodedKey;
 use crate::serialization::b64_encode_part;
@@ -101,7 +103,7 @@ impl EncodingKey {
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
-/// use jsonwebtoken::{encode, Algorithm, Header, EncodingKey};
+/// use jsonwebtoken::{encode, Algorithm, Header, EncodingKey, GetHeader};
 ///
 /// #[derive(Debug, Serialize, Deserialize)]
 /// struct Claims {
@@ -116,14 +118,14 @@ impl EncodingKey {
 ///
 /// // my_claims is a struct that implements Serialize
 /// // This will create a JWT using HS256 as algorithm
-/// let token = encode(&Header::default(), &my_claims, &EncodingKey::from_secret("secret".as_ref())).unwrap();
+/// let token = encode(&Header::new(Algorithm::default()), &my_claims, &EncodingKey::from_secret("secret".as_ref())).unwrap();
 /// ```
-pub fn encode<H: BaseHeader + Serialize, T: Serialize>(
+pub fn encode<H: GetHeader + Serialize, T: Serialize>(
     header: &H,
     claims: &T,
     key: &EncodingKey,
 ) -> Result<String> {
-    let alg = header.get_algorithm();
+    let alg = header.get_header().alg;
     if key.family != alg.family() {
         return Err(new_error(ErrorKind::InvalidAlgorithm));
     }
