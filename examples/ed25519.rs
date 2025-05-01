@@ -1,6 +1,4 @@
-use jsonwebtoken::{
-    decode, encode, get_current_timestamp, Algorithm, DecodingKey, EncodingKey, Header, Validation,
-};
+use jsonwebtoken::{decode, encode, get_current_timestamp, Algorithm, DecodingKey, EncodingKey, GetHeader, Header, Validation};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 

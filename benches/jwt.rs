@@ -19,6 +19,13 @@ impl GetHeader for CustomHeader {
     fn get_header(&self) -> jsonwebtoken::header::BaseHeader {
         self.header.clone()
     }
+
+    fn new(algorithm: Algorithm) -> Self {
+        CustomHeader {
+            header: jsonwebtoken::header::BaseHeader::new(algorithm),
+            custom: Some("header".to_string()),
+        }
+    }
 }
 
 fn bench_encode(c: &mut Criterion) {
@@ -34,10 +41,7 @@ fn bench_encode_custom_header(c: &mut Criterion) {
     let claim = Claims { sub: "b@b.com".to_owned(), company: "ACME".to_owned() };
     let key = EncodingKey::from_secret("secret".as_ref());
 
-    let header = CustomHeader {
-        header: jsonwebtoken::header::BaseHeader::default(),
-        custom: Some("header".to_string()),
-    };
+    let header = CustomHeader::new(Algorithm::HS256);
 
     c.bench_function("bench_encode", |b| {
         b.iter(|| encode(black_box(&header), black_box(&claim), black_box(&key)))

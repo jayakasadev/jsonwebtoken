@@ -1,7 +1,4 @@
-use jsonwebtoken::{
-    crypto::{sign, verify},
-    Algorithm, DecodingKey, EncodingKey,
-};
+use jsonwebtoken::{crypto::{sign, verify}, Algorithm, DecodingKey, EncodingKey, GetHeader};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "use_pem")]
