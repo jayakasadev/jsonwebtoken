@@ -158,9 +158,7 @@ impl <'de> Deserialize<'de> for BaseHeader {
                 deserializer.deserialize_identifier(FieldVisitor)
             }
         }
-
-
-
+        
         struct BaseHeaderVisitor;
 
         impl<'de> Visitor<'de> for BaseHeaderVisitor {

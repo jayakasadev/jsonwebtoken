@@ -1,11 +1,6 @@
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::jwk::Jwk;
-use jsonwebtoken::{
-    b64_decode,
-    crypto::{sign, verify},
-    decode, decode_header, encode, Algorithm, BaseHeader, DecodingKey, EncodingKey, Header,
-    Validation,
-};
+use jsonwebtoken::{crypto::{sign, verify}, decode, decode_header, encode, Algorithm, DecodingKey, EncodingKey, GetHeader, Header, Validation};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -38,22 +33,48 @@ fn verify_hs256() {
 #[test]
 #[wasm_bindgen_test]
 fn encode_with_extra_headers() {
+
+    #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct CustomHeader {
+        #[serde(flatten)]
+        pub header: jsonwebtoken::header::BaseHeader,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub custom: Option<String>,
+    }
+
+    impl GetHeader for CustomHeader {
+        fn get_header(&self) -> jsonwebtoken::header::BaseHeader {
+            self.header.clone()
+        }
+
+        fn new(algorithm: Algorithm) -> Self {
+            CustomHeader {
+                header: {
+                    let mut header = jsonwebtoken::header::BaseHeader::new(algorithm);
+                    header.kid = Some("kid".to_string());
+                    header
+                },
+                custom: Some("header".to_string()),
+            }
+        }
+    }
+    
     let my_claims = Claims {
         sub: "b@b.com".to_string(),
         company: "ACME".to_string(),
         exp: OffsetDateTime::now_utc().unix_timestamp() + 10000,
     };
-    let header = Header { kid: Some("kid".to_string()), ..Default::default() };
+    let header = CustomHeader::new(Algorithm::HS256);
     let token = encode(&header, &my_claims, &EncodingKey::from_secret(b"secret")).unwrap();
-    let token_data = decode::<Header, Claims>(
+    let token_data = decode::<CustomHeader, Claims>(
         &token,
         &DecodingKey::from_secret(b"secret"),
         &Validation::new(Algorithm::HS256),
     )
     .unwrap();
     assert_eq!(my_claims, token_data.claims);
-    assert_eq!("kid", token_data.header.kid.unwrap());
-    assert_eq!("header", token_data.header.extra.unwrap().get("custom").unwrap().as_str());
+    assert_eq!("kid", token_data.header.header.kid.unwrap());
+    assert_eq!("header", token_data.header.custom.unwrap().as_str());
 }
 
 #[test]
@@ -73,7 +94,7 @@ fn round_trip_claim() {
     )
     .unwrap();
     assert_eq!(my_claims, token_data.claims);
-    assert!(token_data.header.kid.is_none());
+    assert!(token_data.header.base.kid.is_none());
 }
 
 #[test]
@@ -93,7 +114,31 @@ fn decode_token() {
 #[wasm_bindgen_test]
 fn decode_token_custom_headers() {
     let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6ImtpZCIsImN1c3RvbTEiOiJoZWFkZXIxIiwiY3VzdG9tMiI6ImhlYWRlcjIifQ.eyJzdWIiOiJiQGIuY29tIiwiY29tcGFueSI6IkFDTUUiLCJleHAiOjI1MzI1MjQ4OTF9.FtOHsoKcNH3SriK3tnR-uWJg4UV4FkOzvq_JCfLngfU";
-    let claims = decode::<Claims>(
+    #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct CustomHeader {
+        #[serde(flatten)]
+        pub header: jsonwebtoken::header::BaseHeader,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub custom1: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub custom2: Option<String>,
+    }
+
+    impl GetHeader for CustomHeader {
+        fn get_header(&self) -> jsonwebtoken::header::BaseHeader {
+            self.header.clone()
+        }
+
+        fn new(algorithm: Algorithm) -> Self {
+            CustomHeader {
+                header: jsonwebtoken::header::BaseHeader::new(algorithm),
+                custom1: Some("header1".to_string()),
+                custom2: Some("header2".to_string()),
+            }
+        }
+    }
+    
+    let claims = decode::<CustomHeader, Claims>(
         token,
         &DecodingKey::from_secret(b"secret"),
         &Validation::new(Algorithm::HS256),
@@ -102,10 +147,10 @@ fn decode_token_custom_headers() {
     let my_claims =
         Claims { sub: "b@b.com".to_string(), company: "ACME".to_string(), exp: 2532524891 };
     assert_eq!(my_claims, claims.claims);
-    assert_eq!("kid", claims.header.kid.unwrap());
-    let extras = claims.header.extras;
-    assert_eq!("header1", extras.get("custom1").unwrap().as_str());
-    assert_eq!("header2", extras.get("custom2").unwrap().as_str());
+    let custom_headers = claims.header;
+    assert_eq!("kid", custom_headers.header.kid.unwrap());
+    assert_eq!("header1", custom_headers.custom1.unwrap().as_str());
+    assert_eq!("header2", custom_headers.custom2.unwrap().as_str());
 }
 
 #[test]
@@ -177,9 +222,9 @@ fn decode_token_with_bytes_secret() {
 #[wasm_bindgen_test]
 fn decode_header_only() {
     let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjb21wYW55IjoiMTIzNDU2Nzg5MCIsInN1YiI6IkpvaG4gRG9lIn0.S";
-    let header = decode_header(token).unwrap();
-    assert_eq!(header.alg, Algorithm::HS256);
-    assert_eq!(header.typ, Some("JWT".to_string()));
+    let header = decode_header::<Header>(token).unwrap();
+    assert_eq!(header.base.alg, Algorithm::HS256);
+    assert_eq!(header.base.typ, Some("JWT".to_string()));
 }
 
 #[test]

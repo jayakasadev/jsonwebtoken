@@ -10,9 +10,9 @@ struct Claims {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct CustomHeader {
+    #[serde(flatten)]
     pub header: jsonwebtoken::header::BaseHeader,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<String>,
+    pub custom: String,
 }
 
 impl GetHeader for CustomHeader {
@@ -23,7 +23,7 @@ impl GetHeader for CustomHeader {
     fn new(algorithm: Algorithm) -> Self {
         CustomHeader {
             header: jsonwebtoken::header::BaseHeader::new(algorithm),
-            custom: Some("header".to_string()),
+            custom: "header".to_string(),
         }
     }
 }
