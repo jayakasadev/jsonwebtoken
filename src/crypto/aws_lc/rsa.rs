@@ -15,7 +15,7 @@ fn try_sign_rsa(
     algorithm: &'static dyn crypto_sig::RsaEncoding,
     encoding_key: &EncodingKey,
     msg: &[u8],
-) -> std::result::Result<Vec<u8>, signature::Error> {
+) -> core::result::Result<Vec<u8>, signature::Error> {
     let key_pair = crypto_sig::RsaKeyPair::from_der(encoding_key.inner())
         .map_err(signature::Error::from_source)?;
 
@@ -36,7 +36,7 @@ fn verify_rsa(
     decoding_key: &DecodingKey,
     msg: &[u8],
     signature: &[u8],
-) -> std::result::Result<(), signature::Error> {
+) -> core::result::Result<(), signature::Error> {
     match &decoding_key.kind {
         DecodingKeyKind::SecretOrDer(bytes) => {
             let public_key = crypto_sig::UnparsedPublicKey::new(algorithm, bytes);
@@ -66,7 +66,7 @@ macro_rules! define_rsa_signer {
         }
 
         impl Signer<Vec<u8>> for $name {
-            fn try_sign(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, signature::Error> {
+            fn try_sign(&self, msg: &[u8]) -> core::result::Result<Vec<u8>, signature::Error> {
                 try_sign_rsa($signing_alg, &self.0, msg)
             }
         }
@@ -98,7 +98,7 @@ macro_rules! define_rsa_verifier {
                 &self,
                 msg: &[u8],
                 signature: &Vec<u8>,
-            ) -> std::result::Result<(), signature::Error> {
+            ) -> core::result::Result<(), signature::Error> {
                 verify_rsa($verification_alg, &self.0, msg, signature)
             }
         }

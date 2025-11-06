@@ -19,7 +19,7 @@ macro_rules! define_hmac_signer {
         }
 
         impl Signer<Vec<u8>> for $name {
-            fn try_sign(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, signature::Error> {
+            fn try_sign(&self, msg: &[u8]) -> core::result::Result<Vec<u8>, signature::Error> {
                 Ok(hmac::sign(&self.0, msg).as_ref().to_vec())
             }
         }
@@ -47,7 +47,7 @@ macro_rules! define_hmac_verifier {
                 &self,
                 msg: &[u8],
                 signature: &Vec<u8>,
-            ) -> std::result::Result<(), signature::Error> {
+            ) -> core::result::Result<(), signature::Error> {
                 hmac::verify(&self.0, msg, signature).map_err(signature::Error::from_source)
             }
         }

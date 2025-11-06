@@ -1,5 +1,7 @@
 //! Implementations of the [`JwtSigner`] and [`JwtVerifier`] traits for EdDSA using RustCrypto.
 
+extern crate alloc;
+use alloc::vec::Vec;
 use crate::algorithms::AlgorithmFamily;
 use crate::crypto::{JwtSigner, JwtVerifier};
 use crate::errors::{ErrorKind, Result, new_error};
@@ -24,7 +26,7 @@ impl EdDSASigner {
 }
 
 impl Signer<Vec<u8>> for EdDSASigner {
-    fn try_sign(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, Error> {
+    fn try_sign(&self, msg: &[u8]) -> core::result::Result<Vec<u8>, Error> {
         Ok(self.0.sign(msg).to_bytes().to_vec())
     }
 }
@@ -54,7 +56,7 @@ impl EdDSAVerifier {
 }
 
 impl Verifier<Vec<u8>> for EdDSAVerifier {
-    fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> std::result::Result<(), Error> {
+    fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> core::result::Result<(), Error> {
         self.0.verify(msg, &Signature::from_slice(signature)?)?;
         Ok(())
     }

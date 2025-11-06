@@ -1,5 +1,6 @@
 /// Example for the backend to backend implementation
-use std::collections::HashMap;
+extern crate alloc;
+use alloc::collections::BTreeMap;
 
 use jsonwebtoken::jwk::JwkSet;
 use jsonwebtoken::{Validation, decode, decode_header};
@@ -29,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let decoded_token =
-        decode::<HashMap<String, serde_json::Value>>(TOKEN, &jwk.try_into()?, &validation)?;
+        decode::<BTreeMap<String, serde_json::Value>>(TOKEN, &jwk.try_into()?, &validation)?;
 
     println!("{:#?}", decoded_token);
 

@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Formatter};
+extern crate alloc;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use core::fmt::{Debug, Formatter};
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::de::DeserializeOwned;
@@ -72,7 +75,7 @@ pub(crate) enum DecodingKeyKind {
 }
 
 impl Debug for DecodingKeyKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::SecretOrDer(_) => f.debug_tuple("SecretOrDer").field(&"[redacted]").finish(),
             Self::RsaModulusExponent { .. } => f

@@ -1,6 +1,8 @@
 //! Implementations of the [`JwtSigner`] and [`JwtVerifier`] traits for the
 //! RSA family of algorithms using RustCrypto.
 
+extern crate alloc;
+use alloc::vec::Vec;
 use hmac::digest::FixedOutputReset;
 use rsa::{
     BigUint, Pkcs1v15Sign, Pss, RsaPublicKey,
@@ -23,7 +25,7 @@ fn try_sign_rsa<H>(
     encoding_key: &EncodingKey,
     msg: &[u8],
     pss: bool,
-) -> std::result::Result<Vec<u8>, signature::Error>
+) -> core::result::Result<Vec<u8>, signature::Error>
 where
     H: Digest + AssociatedOid + FixedOutputReset,
 {
@@ -46,7 +48,7 @@ fn verify_rsa<S: SignatureScheme, H: Digest + AssociatedOid>(
     decoding_key: &DecodingKey,
     msg: &[u8],
     signature: &[u8],
-) -> std::result::Result<(), signature::Error> {
+) -> core::result::Result<(), signature::Error> {
     let digest = H::digest(msg);
 
     match &decoding_key.kind {
@@ -81,7 +83,7 @@ macro_rules! define_rsa_signer {
         }
 
         impl Signer<Vec<u8>> for $name {
-            fn try_sign(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, signature::Error> {
+            fn try_sign(&self, msg: &[u8]) -> core::result::Result<Vec<u8>, signature::Error> {
                 try_sign_rsa::<$hash>(&self.0, msg, $pss)
             }
         }
@@ -113,7 +115,7 @@ macro_rules! define_rsa_verifier {
                 &self,
                 msg: &[u8],
                 signature: &Vec<u8>,
-            ) -> std::result::Result<(), signature::Error> {
+            ) -> core::result::Result<(), signature::Error> {
                 if $pss {
                     verify_rsa::<Pss, $hash>(Pss::new::<$hash>(), &self.0, msg, signature)
                 } else {

@@ -30,7 +30,7 @@ macro_rules! define_ecdsa_signer {
         }
 
         impl Signer<Vec<u8>> for $name {
-            fn try_sign(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, Error> {
+            fn try_sign(&self, msg: &[u8]) -> core::result::Result<Vec<u8>, Error> {
                 let rng = SystemRandom::new();
                 let signature = self.0.sign(&rng, msg).map_err(Error::from_source)?;
                 Ok(signature.as_ref().to_vec())
@@ -60,7 +60,7 @@ macro_rules! define_ecdsa_verifier {
         }
 
         impl Verifier<Vec<u8>> for $name {
-            fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> std::result::Result<(), Error> {
+            fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> core::result::Result<(), Error> {
                 $verification_alg
                     .verify_sig(self.0.as_bytes(), msg, signature)
                     .map_err(Error::from_source)?;

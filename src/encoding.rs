@@ -1,4 +1,8 @@
-use std::fmt::{Debug, Formatter};
+extern crate alloc;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::fmt::{Debug, Formatter};
 
 use base64::{
     Engine,
@@ -141,7 +145,7 @@ impl EncodingKey {
 }
 
 impl Debug for EncodingKey {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("EncodingKey")
             .field("family", &self.family)
             .field("content", &"[redacted]")

@@ -1,3 +1,6 @@
+extern crate alloc;
+use alloc::string::String;
+use alloc::vec::Vec;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
 

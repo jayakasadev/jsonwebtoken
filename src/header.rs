@@ -1,5 +1,8 @@
-use std::collections::HashMap;
-use std::result;
+extern crate alloc;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use alloc::collections::BTreeMap;
+use core::result;
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -35,7 +38,7 @@ pub enum Enc {
 }
 
 impl Serialize for Enc {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -53,7 +56,7 @@ impl Serialize for Enc {
 }
 
 impl<'de> Deserialize<'de> for Enc {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -81,7 +84,7 @@ pub enum Zip {
 }
 
 impl Serialize for Zip {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -94,7 +97,7 @@ impl Serialize for Zip {
 }
 
 impl<'de> Deserialize<'de> for Zip {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -187,7 +190,7 @@ pub struct Header {
     /// Once serialized, all keys will be converted to fields at the root level of the header payload
     /// Ex: Dict("custom" -> "header") will be converted to "{"typ": "JWT", ..., "custom": "header"}"
     #[serde(flatten)]
-    pub extras: HashMap<String, String>,
+    pub extras: BTreeMap<String, String>,
 }
 
 impl Header {

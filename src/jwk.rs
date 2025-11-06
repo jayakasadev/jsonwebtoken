@@ -4,7 +4,12 @@
 //! Most of the code in this file is taken from <https://github.com/lawliet89/biscuit> but
 //! tweaked to remove the private bits as it's not the goal for this crate currently.
 
-use std::{fmt, str::FromStr};
+extern crate alloc;
+
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::{fmt, str::FromStr};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
@@ -661,6 +666,7 @@ impl JwkSet {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
     use serde_json::json;
     use wasm_bindgen_test::wasm_bindgen_test;
 

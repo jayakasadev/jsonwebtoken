@@ -1,5 +1,6 @@
+extern crate alloc;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use alloc::collections::BTreeMap;
 
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -16,7 +17,7 @@ fn main() {
         Claims { sub: "b@b.com".to_owned(), company: "ACME".to_owned(), exp: 10000000000 };
     let key = b"secret";
 
-    let mut extras = HashMap::with_capacity(1);
+    let mut extras = BTreeMap::new();
     extras.insert("custom".to_string(), "header".to_string());
 
     let header = Header {

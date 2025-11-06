@@ -1,9 +1,11 @@
+#![cfg_attr(not(test), no_std)]
 //! Create and parses JWT (JSON Web Tokens)
 //!
 //! Documentation:  [stable](https://docs.rs/jsonwebtoken)
 //!
 
 #![deny(missing_docs)]
+extern crate alloc;
 
 #[cfg(all(feature = "rust_crypto", feature = "aws_lc_rs"))]
 compile_error!(

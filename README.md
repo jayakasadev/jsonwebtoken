@@ -83,7 +83,7 @@ If you want to set the `kid` parameter or change the algorithm for example:
 let mut header = Header::new(Algorithm::HS512);
 header.kid = Some("blabla".to_owned());
 
-let mut extras = HashMap::with_capacity(1);
+let mut extras = BTreeMap::new();
 extras.insert("custom".to_string(), "header".to_string());
 header.extras = Some(extras);
 

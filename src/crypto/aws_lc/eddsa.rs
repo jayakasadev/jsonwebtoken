@@ -23,7 +23,7 @@ impl EdDSASigner {
 }
 
 impl Signer<Vec<u8>> for EdDSASigner {
-    fn try_sign(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, Error> {
+    fn try_sign(&self, msg: &[u8]) -> core::result::Result<Vec<u8>, Error> {
         Ok(self.0.sign(msg).as_ref().to_vec())
     }
 }
@@ -47,7 +47,7 @@ impl EdDSAVerifier {
 }
 
 impl Verifier<Vec<u8>> for EdDSAVerifier {
-    fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> std::result::Result<(), Error> {
+    fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> core::result::Result<(), Error> {
         ED25519.verify_sig(self.0.as_bytes(), msg, signature).map_err(Error::from_source)?;
         Ok(())
     }

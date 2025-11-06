@@ -1,6 +1,6 @@
 use ed25519_dalek::SigningKey;
 use ed25519_dalek::pkcs8::EncodePrivateKey;
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
 use jsonwebtoken::{
@@ -14,7 +14,8 @@ pub struct Claims {
 }
 
 fn main() {
-    let signing_key = SigningKey::generate(&mut OsRng);
+    let mut csprng = OsRng;
+    let signing_key = SigningKey::generate(&mut csprng);
     let pkcs8 = signing_key.to_pkcs8_der().unwrap();
     let pkcs8 = pkcs8.as_bytes();
     // The `to_pkcs8_der` includes the public key, the first 48 bits are the private key.

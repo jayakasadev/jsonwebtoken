@@ -6,7 +6,10 @@
 //! [`JwtVerifier`]: crate::crypto::JwtVerifier
 //! [`Signer`]: signature::Signer
 //! [`Verifier`]: signature::Verifier
+extern crate alloc;
 
+use alloc::string::String;
+use alloc::vec::Vec;
 use crate::algorithms::Algorithm;
 use crate::errors::Result;
 use crate::{DecodingKey, EncodingKey};

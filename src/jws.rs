@@ -1,5 +1,8 @@
 //! JSON Web Signatures data type.
-use std::marker::PhantomData;
+extern crate alloc;
+
+use alloc::string::{String, ToString};
+use core::marker::PhantomData;
 
 use crate::crypto::sign;
 use crate::errors::{ErrorKind, Result, new_error};

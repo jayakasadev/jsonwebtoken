@@ -1,7 +1,12 @@
-use std::error::Error as StdError;
-use std::fmt;
-use std::result;
-use std::sync::Arc;
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
+use core::error::Error as StdError;
+use core::fmt;
+use core::result;
+use alloc::sync::Arc;
 
 /// A crate private constructor for `Error`.
 pub(crate) fn new_error(kind: ErrorKind) -> Error {
@@ -77,7 +82,7 @@ pub enum ErrorKind {
     /// An error happened while serializing/deserializing JSON
     Json(Arc<serde_json::Error>),
     /// Some of the text was invalid UTF-8
-    Utf8(::std::string::FromUtf8Error),
+    Utf8(::alloc::string::FromUtf8Error),
 }
 
 impl StdError for Error {
@@ -153,8 +158,8 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<::std::string::FromUtf8Error> for Error {
-    fn from(err: ::std::string::FromUtf8Error) -> Error {
+impl From<::alloc::string::FromUtf8Error> for Error {
+    fn from(err: ::alloc::string::FromUtf8Error) -> Error {
         new_error(ErrorKind::Utf8(err))
     }
 }
@@ -167,6 +172,7 @@ impl From<ErrorKind> for Error {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::ToString;
     use wasm_bindgen_test::wasm_bindgen_test;
 
     use super::*;

@@ -1,7 +1,11 @@
-use std::borrow::Cow;
-use std::collections::HashSet;
-use std::fmt;
-use std::marker::PhantomData;
+extern crate alloc;
+use alloc::borrow::{Cow, ToOwned};
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::collections::BTreeSet;
+use core::fmt;
+use core::marker::PhantomData;
 
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
@@ -35,7 +39,7 @@ pub struct Validation {
     /// The only value that will be used are "exp", "nbf", "aud", "iss", "sub". Anything else will be ignored.
     ///
     /// Defaults to `{"exp"}`
-    pub required_spec_claims: HashSet<String>,
+    pub required_spec_claims: BTreeSet<String>,
     /// Add some leeway (in seconds) to the `exp` and `nbf` validation to
     /// account for clock skew.
     ///
@@ -80,7 +84,7 @@ pub struct Validation {
     /// Adding `aud` to `required_spec_claims` will make it required.
     ///
     /// Defaults to `None`.
-    pub aud: Option<HashSet<String>>,
+    pub aud: Option<BTreeSet<String>>,
     /// If it contains a value, the validation will check that the `iss` field is a member of the
     /// iss provided and will error otherwise.
     /// Use `set_issuer` to set it
@@ -89,7 +93,7 @@ pub struct Validation {
     /// Adding `iss` to `required_spec_claims` will make it required.
     ///
     /// Defaults to `None`.
-    pub iss: Option<HashSet<String>>,
+    pub iss: Option<BTreeSet<String>>,
     /// If it contains a value, the validation will check that the `sub` field is the same as the
     /// one provided and will error otherwise.
     ///
@@ -111,7 +115,7 @@ pub struct Validation {
 impl Validation {
     /// Create a default validation setup allowing the given alg
     pub fn new(alg: Algorithm) -> Validation {
-        let mut required_claims = HashSet::with_capacity(1);
+        let mut required_claims = BTreeSet::new();
         required_claims.insert("exp".to_owned());
 
         Validation {
@@ -175,8 +179,7 @@ impl Default for Validation {
 #[cfg(not(all(target_arch = "wasm32", not(any(target_os = "emscripten", target_os = "wasi")))))]
 #[must_use]
 pub fn get_current_timestamp() -> u64 {
-    let start = std::time::SystemTime::now();
-    start.duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs()
+    chrono::Utc::now().timestamp() as u64
 }
 
 /// Gets the current timestamp in the format expected by JWTs.
@@ -210,7 +213,7 @@ enum TryParse<T> {
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for TryParse<T> {
     fn deserialize<D: serde::Deserializer<'de>>(
         deserializer: D,
-    ) -> std::result::Result<Self, D::Error> {
+    ) -> core::result::Result<Self, D::Error> {
         Ok(match Option::<T>::deserialize(deserializer) {
             Ok(Some(value)) => TryParse::Parsed(value),
             Ok(None) => TryParse::NotPresent,
@@ -229,29 +232,29 @@ impl<T> Default for TryParse<T> {
 #[serde(untagged)]
 enum Audience<'a> {
     Single(#[serde(borrow)] Cow<'a, str>),
-    Multiple(#[serde(borrow)] HashSet<BorrowedCowIfPossible<'a>>),
+    Multiple(#[serde(borrow)] BTreeSet<BorrowedCowIfPossible<'a>>),
 }
 
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Issuer<'a> {
     Single(#[serde(borrow)] Cow<'a, str>),
-    Multiple(#[serde(borrow)] HashSet<BorrowedCowIfPossible<'a>>),
+    Multiple(#[serde(borrow)] BTreeSet<BorrowedCowIfPossible<'a>>),
 }
 
 /// Usually #[serde(borrow)] on `Cow` enables deserializing with no allocations where
-/// possible (no escapes in the original str) but it does not work on e.g. `HashSet<Cow<str>>`
+/// possible (no escapes in the original str) but it does not work on e.g. `BTreeSet<Cow<str>>`
 /// We use this struct in this case.
-#[derive(Deserialize, PartialEq, Eq, Hash)]
+#[derive(Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd)]
 struct BorrowedCowIfPossible<'a>(#[serde(borrow)] Cow<'a, str>);
 
-impl std::borrow::Borrow<str> for BorrowedCowIfPossible<'_> {
+impl core::borrow::Borrow<str> for BorrowedCowIfPossible<'_> {
     fn borrow(&self) -> &str {
         &self.0
     }
 }
 
-fn is_subset(reference: &HashSet<String>, given: &HashSet<BorrowedCowIfPossible<'_>>) -> bool {
+fn is_subset(reference: &BTreeSet<String>, given: &BTreeSet<BorrowedCowIfPossible<'_>>) -> bool {
     // Check that intersection is non-empty, favoring iterating on smallest
     if reference.len() < given.len() {
         reference.iter().any(|a| given.contains(&**a))
@@ -349,7 +352,7 @@ pub(crate) fn validate(claims: ClaimsForValidation, options: &Validation) -> Res
     Ok(())
 }
 
-fn numeric_type<'de, D>(deserializer: D) -> std::result::Result<TryParse<u64>, D::Error>
+fn numeric_type<'de, D>(deserializer: D) -> core::result::Result<TryParse<u64>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -362,14 +365,14 @@ where
             formatter.write_str("A NumericType that can be reasonably coerced into a u64")
         }
 
-        fn visit_u64<E>(self, value: u64) -> std::result::Result<Self::Value, E>
+        fn visit_u64<E>(self, value: u64) -> core::result::Result<Self::Value, E>
         where
             E: de::Error,
         {
             Ok(TryParse::Parsed(value))
         }
 
-        fn visit_f64<E>(self, value: f64) -> std::result::Result<Self::Value, E>
+        fn visit_f64<E>(self, value: f64) -> core::result::Result<Self::Value, E>
         where
             E: de::Error,
         {
@@ -389,7 +392,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    extern crate alloc;
+    use alloc::borrow::ToOwned;
+    use alloc::string::ToString;
+    use alloc::collections::BTreeSet;
 
     use serde_json::json;
     use wasm_bindgen_test::wasm_bindgen_test;
@@ -495,7 +501,7 @@ mod tests {
     fn exp_validated_but_not_required_ok() {
         let claims = json!({});
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = true;
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_ok());
@@ -506,7 +512,7 @@ mod tests {
     fn exp_validated_but_not_required_fails() {
         let claims = json!({ "exp": (get_current_timestamp() as f64) - 100000.1234 });
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = true;
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_err());
@@ -539,7 +545,7 @@ mod tests {
     fn nbf_in_past_ok() {
         let claims = json!({ "nbf": get_current_timestamp() - 10000 });
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.validate_nbf = true;
         let res = validate(deserialize_claims(&claims), &validation);
@@ -551,7 +557,7 @@ mod tests {
     fn nbf_float_in_past_ok() {
         let claims = json!({ "nbf": (get_current_timestamp() as f64) - 10000.1234 });
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.validate_nbf = true;
         let res = validate(deserialize_claims(&claims), &validation);
@@ -563,7 +569,7 @@ mod tests {
     fn nbf_in_future_fails() {
         let claims = json!({ "nbf": get_current_timestamp() + 100000 });
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.validate_nbf = true;
         let res = validate(deserialize_claims(&claims), &validation);
@@ -580,7 +586,7 @@ mod tests {
     fn nbf_in_future_but_in_leeway_ok() {
         let claims = json!({ "nbf": get_current_timestamp() + 500 });
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.validate_nbf = true;
         validation.leeway = 1000 * 60;
@@ -593,7 +599,7 @@ mod tests {
     fn iss_string_ok() {
         let claims = json!({"iss": ["Keats"]});
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.set_issuer(&["Keats"]);
         let res = validate(deserialize_claims(&claims), &validation);
@@ -605,7 +611,7 @@ mod tests {
     fn iss_array_of_string_ok() {
         let claims = json!({"iss": ["UserA", "UserB"]});
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.set_issuer(&["UserA", "UserB"]);
         let res = validate(deserialize_claims(&claims), &validation);
@@ -618,7 +624,7 @@ mod tests {
         let claims = json!({"iss": "Hacked"});
 
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.set_issuer(&["Keats"]);
         let res = validate(deserialize_claims(&claims), &validation);
@@ -652,7 +658,7 @@ mod tests {
     fn sub_ok() {
         let claims = json!({"sub": "Keats"});
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.sub = Some("Keats".to_owned());
         let res = validate(deserialize_claims(&claims), &validation);
@@ -664,7 +670,7 @@ mod tests {
     fn sub_not_matching_fails() {
         let claims = json!({"sub": "Hacked"});
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.validate_exp = false;
         validation.sub = Some("Keats".to_owned());
         let res = validate(deserialize_claims(&claims), &validation);
@@ -699,7 +705,7 @@ mod tests {
         let claims = json!({"aud": "Everyone"});
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.set_audience(&["Everyone"]);
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_ok());
@@ -711,7 +717,7 @@ mod tests {
         let claims = json!({"aud": ["UserA", "UserB"]});
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.set_audience(&["UserA", "UserB"]);
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_ok());
@@ -723,7 +729,7 @@ mod tests {
         let claims = json!({"aud": ["Everyone"]});
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.set_audience(&["UserA", "UserB"]);
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_err());
@@ -740,7 +746,7 @@ mod tests {
         let claims = json!({"aud": ["Everyone"]});
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.set_audience(&["None"]);
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_err());
@@ -757,7 +763,7 @@ mod tests {
         let claims = json!({"aud": ["Everyone"]});
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.aud = None;
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_err());
@@ -775,7 +781,7 @@ mod tests {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;
         validation.validate_aud = false;
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.aud = None;
         let res = validate(deserialize_claims(&claims), &validation);
         assert!(res.is_ok());
@@ -826,11 +832,11 @@ mod tests {
         let claims = json!({"aud": "my-googleclientid1234.apps.googleusercontent.com"});
 
         let aud = "my-googleclientid1234.apps.googleusercontent.com".to_string();
-        let mut aud_hashset = std::collections::HashSet::new();
+        let mut aud_hashset = BTreeSet::new();
         aud_hashset.insert(aud);
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false;
-        validation.required_spec_claims = HashSet::new();
+        validation.required_spec_claims = BTreeSet::new();
         validation.set_audience(&["my-googleclientid1234.apps.googleusercontent.com"]);
 
         let res = validate(deserialize_claims(&claims), &validation);

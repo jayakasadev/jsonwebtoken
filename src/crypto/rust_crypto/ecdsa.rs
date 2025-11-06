@@ -1,6 +1,8 @@
 //! Implementations of the [`JwtSigner`] and [`JwtVerifier`] traits for the
 //! ECDSA family of algorithms using RustCrypto
 
+extern crate alloc;
+use alloc::vec::Vec;
 use crate::algorithms::AlgorithmFamily;
 use crate::crypto::{JwtSigner, JwtVerifier};
 use crate::errors::{ErrorKind, Result, new_error};
@@ -32,7 +34,7 @@ macro_rules! define_ecdsa_signer {
         }
 
         impl Signer<Vec<u8>> for $name {
-            fn try_sign(&self, msg: &[u8]) -> std::result::Result<Vec<u8>, Error> {
+            fn try_sign(&self, msg: &[u8]) -> core::result::Result<Vec<u8>, Error> {
                 let signature = self.0.sign_recoverable(msg).map_err(Error::from_source)?.0;
                 Ok(signature.to_vec())
             }
@@ -64,7 +66,7 @@ macro_rules! define_ecdsa_verifier {
         }
 
         impl Verifier<Vec<u8>> for $name {
-            fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> std::result::Result<(), Error> {
+            fn verify(&self, msg: &[u8], signature: &Vec<u8>) -> core::result::Result<(), Error> {
                 self.0
                     .verify(msg, &<$signature>::from_slice(signature).map_err(Error::from_source)?)
                     .map_err(Error::from_source)?;

@@ -1,6 +1,7 @@
 #![allow(deprecated)]
+extern crate alloc;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use alloc::collections::BTreeMap;
 use time::OffsetDateTime;
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -67,7 +68,7 @@ fn encode_with_extra_custom_header() {
         company: "ACME".to_string(),
         exp: OffsetDateTime::now_utc().unix_timestamp() + 10000,
     };
-    let mut extras = HashMap::with_capacity(1);
+    let mut extras = BTreeMap::new();
     extras.insert("custom".to_string(), "header".to_string());
     let header = Header { kid: Some("kid".to_string()), extras, ..Default::default() };
     let token = encode(&header, &my_claims, &EncodingKey::from_secret(b"secret")).unwrap();
@@ -90,7 +91,7 @@ fn encode_with_multiple_extra_custom_headers() {
         company: "ACME".to_string(),
         exp: OffsetDateTime::now_utc().unix_timestamp() + 10000,
     };
-    let mut extras = HashMap::with_capacity(2);
+    let mut extras = BTreeMap::new();
     extras.insert("custom1".to_string(), "header1".to_string());
     extras.insert("custom2".to_string(), "header2".to_string());
     let header = Header { kid: Some("kid".to_string()), extras, ..Default::default() };
