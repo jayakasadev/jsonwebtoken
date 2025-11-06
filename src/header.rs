@@ -1,7 +1,7 @@
 extern crate alloc;
+use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
 use core::result;
 
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -193,6 +193,26 @@ pub struct Header {
     pub extras: BTreeMap<String, String>,
 }
 
+/// Defines the base header trait.
+pub trait BaseHeader {
+    /// Get algorithm associated with Header
+    fn algorithm(&self) -> Algorithm;
+    /// Converts an encoded part into the Header struct if possible
+    fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+impl BaseHeader for Header {
+    fn algorithm(&self) -> Algorithm {
+        self.alg
+    }
+    fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self> {
+        let decoded = b64_decode(encoded_part)?;
+        Ok(serde_json::from_slice(&decoded)?)
+    }
+}
+
 impl Header {
     /// Returns a JWT header with the algorithm given
     pub fn new(algorithm: Algorithm) -> Self {
@@ -214,12 +234,6 @@ impl Header {
             nonce: None,
             extras: Default::default(),
         }
-    }
-
-    /// Converts an encoded part into the Header struct if possible
-    pub(crate) fn from_encoded<T: AsRef<[u8]>>(encoded_part: T) -> Result<Self> {
-        let decoded = b64_decode(encoded_part)?;
-        Ok(serde_json::from_slice(&decoded)?)
     }
 
     /// Decodes the X.509 certificate chain into ASN.1 DER format.

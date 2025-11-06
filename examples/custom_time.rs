@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{
+    Algorithm, DecodingKey, EncodingKey, Header, Validation, decode_header, jwt_signer_factory,
+    jwt_verifier_factory,
+};
 
 const SECRET: &str = "some-secret";
 
@@ -61,11 +64,11 @@ mod jwt_numeric_date {
 
     #[cfg(test)]
     mod tests {
-        use time::{Duration, OffsetDateTime};
-
         use jsonwebtoken::{
-            Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode,
+            Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, decode_header, encode,
+            jwt_signer_factory, jwt_verifier_factory,
         };
+        use time::{Duration, OffsetDateTime};
 
         use super::super::{Claims, SECRET};
 
@@ -78,16 +81,25 @@ mod jwt_numeric_date {
             let exp = OffsetDateTime::from_unix_timestamp(32503680000).unwrap();
 
             let claims = Claims::new(sub.clone(), iat, exp);
+            let header = Header::default();
+            let signing_provider =
+                jwt_signer_factory(&header.alg, &EncodingKey::from_secret(SECRET.as_ref()))
+                    .unwrap();
 
-            let token =
-                encode(&Header::default(), &claims, &EncodingKey::from_secret(SECRET.as_ref()))
-                    .expect("Failed to encode claims");
+            let mut token = String::new();
+            encode(&signing_provider, &header, &claims, &mut token)
+                .expect("Failed to encode claims");
 
             assert_eq!(&token, EXPECTED_TOKEN);
+            let header: Header = decode_header(token.as_str()).unwrap();
+            let decoding_provider =
+                jwt_verifier_factory(&header.alg, &DecodingKey::from_secret(SECRET.as_ref()))
+                    .unwrap();
 
-            let decoded = decode::<Claims>(
+            let decoded = decode::<Claims, Header>(
+                &decoding_provider,
+                &header.alg,
                 &token,
-                &DecodingKey::from_secret(SECRET.as_ref()),
                 &Validation::new(Algorithm::HS256),
             )
             .expect("Failed to decode token");
@@ -100,9 +112,14 @@ mod jwt_numeric_date {
             // A token with the expiry of i64::MAX + 1
             let overflow_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJDdXN0b20gRGF0ZVRpbWUgc2VyL2RlIiwiaWF0IjowLCJleHAiOjkyMjMzNzIwMzY4NTQ3NzYwMDB9.G2PKreA27U8_xOwuIeCYXacFYeR46f9FyENIZfCrvEc";
 
-            let decode_result = decode::<Claims>(
+            let header = decode_header::<Header>(overflow_token).unwrap();
+            let decoding_provider =
+                jwt_verifier_factory(&header.alg, &DecodingKey::from_secret(SECRET.as_ref()))
+                    .unwrap();
+            let decode_result = decode::<Claims, Header>(
+                &decoding_provider,
+                &header.alg,
                 &overflow_token,
-                &DecodingKey::from_secret(SECRET.as_ref()),
                 &Validation::new(Algorithm::HS256),
             );
 
@@ -116,14 +133,23 @@ mod jwt_numeric_date {
             let sub = "Custom OffsetDateTime ser/de".to_string();
 
             let claims = Claims::new(sub.clone(), iat, exp);
+            let header = Header::default();
+            let signing_provider =
+                jwt_signer_factory(&header.alg, &EncodingKey::from_secret(SECRET.as_ref()))
+                    .unwrap();
 
-            let token =
-                encode(&Header::default(), &claims, &EncodingKey::from_secret(SECRET.as_ref()))
-                    .expect("Failed to encode claims");
+            let mut token = String::new();
+            encode(&signing_provider, &header, &claims, &mut token)
+                .expect("Failed to encode claims");
 
-            let decoded = decode::<Claims>(
+            let header: Header = decode_header(token.as_str()).unwrap();
+            let decoding_provider =
+                jwt_verifier_factory(&header.alg, &DecodingKey::from_secret(SECRET.as_ref()))
+                    .unwrap();
+            let decoded = decode::<Claims, Header>(
+                &decoding_provider,
+                &header.alg,
                 &token,
-                &DecodingKey::from_secret(SECRET.as_ref()),
                 &Validation::new(Algorithm::HS256),
             )
             .expect("Failed to decode token")
@@ -140,18 +166,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let exp = iat + Duration::days(1);
 
     let claims = Claims::new(sub, iat, exp);
+    let header = Header::default();
+    let signing_provider =
+        jwt_signer_factory(&header.alg, &EncodingKey::from_secret(SECRET.as_ref())).unwrap();
 
-    let token = jsonwebtoken::encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(SECRET.as_ref()),
-    )?;
+    let mut token = String::new();
+    jsonwebtoken::encode(&signing_provider, &header, &claims, &mut token)?;
 
     println!("serialized token: {}", &token);
 
-    let token_data = jsonwebtoken::decode::<Claims>(
+    let header: Header = decode_header(token.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_secret(SECRET.as_ref())).unwrap();
+    let token_data = jsonwebtoken::decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &token,
-        &DecodingKey::from_secret(SECRET.as_ref()),
         &Validation::new(Algorithm::HS256),
     )?;
 

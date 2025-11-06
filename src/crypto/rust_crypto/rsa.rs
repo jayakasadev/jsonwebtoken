@@ -70,6 +70,7 @@ fn verify_rsa<S: SignatureScheme, H: Digest + AssociatedOid>(
 
 macro_rules! define_rsa_signer {
     ($name:ident, $alg:expr, $hash:ty, pss = $pss:expr) => {
+        #[derive(Debug)]
         pub struct $name(EncodingKey);
 
         impl $name {
@@ -98,6 +99,7 @@ macro_rules! define_rsa_signer {
 
 macro_rules! define_rsa_verifier {
     ($name:ident, $alg:expr, $hash:ty, pss = $pss:expr) => {
+        #[derive(Debug)]
         pub struct $name(DecodingKey);
 
         impl $name {

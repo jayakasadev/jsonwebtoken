@@ -1,16 +1,17 @@
 //! JSON Web Signatures data type.
 extern crate alloc;
 
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use core::marker::PhantomData;
 
 use crate::crypto::sign;
 use crate::errors::{ErrorKind, Result, new_error};
 use crate::serialization::{DecodedJwtPartClaims, b64_encode_part};
 use crate::validation::validate;
-use crate::{DecodingKey, EncodingKey, Header, TokenData, Validation};
+use crate::{EncodingKey, Header, TokenData, Validation, VerifierAlgorithm, jwt_signer_factory};
 
-use crate::decoding::{jwt_verifier_factory, verify_signature_body};
+use crate::decoding::verify_signature_body;
+use crate::header::BaseHeader;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -45,13 +46,17 @@ pub fn encode<T: Serialize>(
     if key.family != header.alg.family() {
         return Err(new_error(ErrorKind::InvalidAlgorithm));
     }
-    let encoded_header = b64_encode_part(header)?;
-    let encoded_claims = match claims {
-        Some(claims) => b64_encode_part(claims)?,
-        None => "".to_string(),
+    let mut encoded_header = String::new();
+    b64_encode_part(header, &mut encoded_header)?;
+    let mut encoded_claims = String::new();
+    match claims {
+        Some(claims) => b64_encode_part(claims, &mut encoded_claims)?,
+        None => (),
     };
     let message = [encoded_header.as_str(), encoded_claims.as_str()].join(".");
-    let signature = sign(message.as_bytes(), key, header.alg)?;
+    let mut signature = String::new();
+    let provider = jwt_signer_factory(&header.alg, key)?;
+    sign(&provider, message.as_bytes(), &mut signature)?;
 
     Ok(Jws {
         protected: encoded_header,
@@ -62,15 +67,14 @@ pub fn encode<T: Serialize>(
 }
 
 /// Validate a received JWS and decode into the header and claims.
-pub fn decode<T: DeserializeOwned>(
+pub fn decode<T: DeserializeOwned, H: BaseHeader>(
     jws: &Jws<T>,
-    key: &DecodingKey,
     validation: &Validation,
-) -> Result<TokenData<T>> {
-    let header = Header::from_encoded(&jws.protected)?;
+    verifying_provider: &VerifierAlgorithm,
+) -> Result<TokenData<T, H>> {
+    let header = H::from_encoded(&jws.protected)?;
     let message = [jws.protected.as_str(), jws.payload.as_str()].join(".");
 
-    let verifying_provider = jwt_verifier_factory(&header.alg, key)?;
     verify_signature_body(
         message.as_bytes(),
         jws.signature.as_bytes(),

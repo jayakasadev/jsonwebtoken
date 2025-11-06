@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use crate::errors::Result;
 
 #[inline]
-pub(crate) fn b64_encode<T: AsRef<[u8]>>(input: T) -> String {
-    URL_SAFE_NO_PAD.encode(input)
+pub(crate) fn b64_encode<T: AsRef<[u8]>>(input: T, data: &mut String) {
+    URL_SAFE_NO_PAD.encode_string(input, data)
 }
 
 #[inline]
@@ -17,9 +17,10 @@ pub(crate) fn b64_decode<T: AsRef<[u8]>>(input: T) -> Result<Vec<u8>> {
 }
 
 /// Serializes a struct to JSON and encodes it in base64
-pub(crate) fn b64_encode_part<T: Serialize>(input: &T) -> Result<String> {
+pub(crate) fn b64_encode_part<T: Serialize>(input: &T, data: &mut String) -> Result<()> {
     let json = serde_json::to_vec(input)?;
-    Ok(b64_encode(json))
+    b64_encode(json, data);
+    Ok(())
 }
 
 /// This is used to decode from base64 then deserialize from JSON to several structs:

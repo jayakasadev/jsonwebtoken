@@ -570,26 +570,36 @@ impl Jwk {
             },
             algorithm: match key.family {
                 crate::algorithms::AlgorithmFamily::Hmac => {
+                    let mut value = String::new();
+                    b64_encode(&key.content, &mut value);
                     AlgorithmParameters::OctetKey(OctetKeyParameters {
                         key_type: OctetKeyType::Octet,
-                        value: b64_encode(&key.content),
+                        value,
                     })
                 }
                 crate::algorithms::AlgorithmFamily::Rsa => {
                     let (n, e) = extract_rsa_public_key_components(&key.content)?;
+                    let mut n_string = String::new();
+                    let mut e_string = String::new();
+                    b64_encode(n, &mut n_string);
+                    b64_encode(e, &mut e_string);
                     AlgorithmParameters::RSA(RSAKeyParameters {
                         key_type: RSAKeyType::RSA,
-                        n: b64_encode(n),
-                        e: b64_encode(e),
+                        n: n_string,
+                        e: e_string,
                     })
                 }
                 crate::algorithms::AlgorithmFamily::Ec => {
                     let (curve, x, y) = extract_ec_public_key_coordinates(&key.content, alg)?;
+                    let mut x_string = String::new();
+                    let mut y_string = String::new();
+                    b64_encode(x, &mut x_string);
+                    b64_encode(y, &mut y_string);
                     AlgorithmParameters::EllipticCurve(EllipticCurveKeyParameters {
                         key_type: EllipticCurveKeyType::EC,
                         curve,
-                        x: b64_encode(x),
-                        y: b64_encode(y),
+                        x: x_string,
+                        y: y_string,
                     })
                 }
                 crate::algorithms::AlgorithmFamily::Ed => {
@@ -645,7 +655,9 @@ impl Jwk {
                 }
             },
         };
-        b64_encode(compute_digest(pre.as_bytes(), hash_function))
+        let mut thumbprint = String::new();
+        b64_encode(compute_digest(pre.as_bytes(), hash_function), &mut thumbprint);
+        thumbprint
     }
 }
 
@@ -666,7 +678,7 @@ impl JwkSet {
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::ToString;
+    use alloc::string::{String, ToString};
     use serde_json::json;
     use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -680,7 +692,8 @@ mod tests {
     #[test]
     #[wasm_bindgen_test]
     fn check_hs256() {
-        let key = b64_encode("abcdefghijklmnopqrstuvwxyz012345");
+        let mut key = String::new();
+        b64_encode("abcdefghijklmnopqrstuvwxyz012345", &mut key);
         let jwks_json = json!({
             "keys": [
                 {

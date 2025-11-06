@@ -1,9 +1,12 @@
 extern crate alloc;
-use serde::{Deserialize, Serialize};
 use alloc::collections::BTreeMap;
+use serde::{Deserialize, Serialize};
 
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use jsonwebtoken::{
+    Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, decode_header, encode,
+    jwt_signer_factory, jwt_verifier_factory,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Claims {
@@ -26,16 +29,23 @@ fn main() {
         extras,
         ..Default::default()
     };
+    let signing_provider = jwt_signer_factory(&header.alg, &EncodingKey::from_secret(key)).unwrap();
+    let mut token = String::new();
 
-    let token = match encode(&header, &my_claims, &EncodingKey::from_secret(key)) {
+    match encode(&signing_provider, &header, &my_claims, &mut token) {
         Ok(t) => t,
         Err(_) => panic!(), // in practice you would return the error
     };
     println!("{:?}", token);
 
-    let token_data = match decode::<Claims>(
+    let header: Header = decode_header(token.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_secret(key)).unwrap();
+
+    let token_data = match decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &token,
-        &DecodingKey::from_secret(key),
         &Validation::new(Algorithm::HS512),
     ) {
         Ok(c) => c,

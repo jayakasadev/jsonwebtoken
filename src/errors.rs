@@ -3,10 +3,10 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use core::error::Error as StdError;
 use core::fmt;
 use core::result;
-use alloc::sync::Arc;
 
 /// A crate private constructor for `Error`.
 pub(crate) fn new_error(kind: ErrorKind) -> Error {

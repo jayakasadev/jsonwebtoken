@@ -18,6 +18,7 @@ type HmacSha512 = Hmac<Sha512>;
 /// Macro to define an HMAC signer for a specific algorithm
 macro_rules! define_hmac_signer {
     ($name:ident, $alg:expr, $hmac_type:ty) => {
+        #[derive(Debug)]
         pub struct $name($hmac_type);
 
         impl $name {
@@ -50,6 +51,7 @@ macro_rules! define_hmac_signer {
 /// Macro to define an HMAC verifier for a specific algorithm
 macro_rules! define_hmac_verifier {
     ($name:ident, $alg:expr, $hmac_type:ty) => {
+        #[derive(Debug)]
         pub struct $name($hmac_type);
 
         impl $name {

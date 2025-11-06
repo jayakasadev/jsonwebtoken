@@ -6,6 +6,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 use jsonwebtoken::{
     Algorithm, DecodingKey, EncodingKey,
     crypto::{sign, verify},
+    decode_header, jwt_signer_factory, jwt_verifier_factory,
 };
 #[cfg(feature = "use_pem")]
 use jsonwebtoken::{Header, Validation, decode, encode};
@@ -23,8 +24,10 @@ fn round_trip_sign_verification_pk8() {
     let privkey = include_bytes!("private_ecdsa_key.pk8");
     let pubkey = include_bytes!("public_ecdsa_key.pk8");
 
-    let encrypted =
-        sign(b"hello world", &EncodingKey::from_ec_der(privkey), Algorithm::ES256).unwrap();
+    let provider =
+        jwt_signer_factory(&Algorithm::ES256, &EncodingKey::from_ec_der(privkey)).unwrap();
+    let mut encrypted = String::new();
+    sign(&provider, b"hello world", &mut encrypted).unwrap();
     let is_valid =
         verify(&encrypted, b"hello world", &DecodingKey::from_ec_der(pubkey), Algorithm::ES256)
             .unwrap();
@@ -37,9 +40,11 @@ fn round_trip_sign_verification_pk8() {
 fn round_trip_sign_verification_pem() {
     let privkey_pem = include_bytes!("private_ecdsa_key.pem");
     let pubkey_pem = include_bytes!("public_ecdsa_key.pem");
-    let encrypted =
-        sign(b"hello world", &EncodingKey::from_ec_pem(privkey_pem).unwrap(), Algorithm::ES256)
+    let provider =
+        jwt_signer_factory(&Algorithm::ES256, &EncodingKey::from_ec_pem(privkey_pem).unwrap())
             .unwrap();
+    let mut encrypted = String::new();
+    sign(&provider, b"hello world", &mut encrypted).unwrap();
     let is_valid = verify(
         &encrypted,
         b"hello world",
@@ -61,15 +66,18 @@ fn round_trip_claim() {
         company: "ACME".to_string(),
         exp: OffsetDateTime::now_utc().unix_timestamp() + 10000,
     };
-    let token = encode(
-        &Header::new(Algorithm::ES256),
-        &my_claims,
-        &EncodingKey::from_ec_pem(privkey_pem).unwrap(),
-    )
-    .unwrap();
-    let token_data = decode::<Claims>(
+    let header = Header::new(Algorithm::ES256);
+    let signing_provider =
+        jwt_signer_factory(&header.alg, &EncodingKey::from_ec_pem(privkey_pem).unwrap()).unwrap();
+    let mut token = String::new();
+    encode(&signing_provider, &header, &my_claims, &mut token).unwrap();
+    let header: Header = decode_header(token.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_ec_pem(pubkey_pem).unwrap()).unwrap();
+    let token_data = decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &token,
-        &DecodingKey::from_ec_pem(pubkey_pem).unwrap(),
         &Validation::new(Algorithm::ES256),
     )
     .unwrap();
@@ -86,18 +94,21 @@ fn ec_x_y() {
         company: "ACME".to_string(),
         exp: OffsetDateTime::now_utc().unix_timestamp() + 10000,
     };
+    let header = Header::new(Algorithm::ES256);
+    let signing_provider =
+        jwt_signer_factory(&header.alg, &EncodingKey::from_ec_pem(privkey.as_ref()).unwrap())
+            .unwrap();
     let x = "w7JAoU_gJbZJvV-zCOvU9yFJq0FNC_edCMRM78P8eQQ";
     let y = "wQg1EytcsEmGrM70Gb53oluoDbVhCZ3Uq3hHMslHVb4";
-
-    let encrypted = encode(
-        &Header::new(Algorithm::ES256),
-        &my_claims,
-        &EncodingKey::from_ec_pem(privkey.as_ref()).unwrap(),
-    )
-    .unwrap();
-    let res = decode::<Claims>(
+    let mut encrypted = String::new();
+    encode(&signing_provider, &header, &my_claims, &mut encrypted).unwrap();
+    let header: Header = decode_header(encrypted.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_ec_components(x, y).unwrap()).unwrap();
+    let res = decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &encrypted,
-        &DecodingKey::from_ec_components(x, y).unwrap(),
         &Validation::new(Algorithm::ES256),
     );
     assert!(res.is_ok());
@@ -116,6 +127,10 @@ fn ed_jwk() {
         company: "ACME".to_string(),
         exp: OffsetDateTime::now_utc().unix_timestamp() + 10000,
     };
+    let header = Header::new(Algorithm::ES256);
+    let signing_provider =
+        jwt_signer_factory(&header.alg, &EncodingKey::from_ec_pem(privkey.as_ref()).unwrap())
+            .unwrap();
     let jwk: Jwk = serde_json::from_value(json!({
         "kty": "EC",
         "crv": "P-256",
@@ -127,15 +142,15 @@ fn ed_jwk() {
     }))
     .unwrap();
 
-    let encrypted = encode(
-        &Header::new(Algorithm::ES256),
-        &my_claims,
-        &EncodingKey::from_ec_pem(privkey.as_ref()).unwrap(),
-    )
-    .unwrap();
-    let res = decode::<Claims>(
+    let mut encrypted = String::new();
+    encode(&signing_provider, &header, &my_claims, &mut encrypted).unwrap();
+    let header: Header = decode_header(encrypted.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_jwk(&jwk).unwrap()).unwrap();
+    let res = decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &encrypted,
-        &DecodingKey::from_jwk(&jwk).unwrap(),
         &Validation::new(Algorithm::ES256),
     );
     assert!(res.is_ok());
@@ -154,15 +169,19 @@ fn roundtrip_with_jwtio_example() {
         company: "ACME".to_string(),
         exp: OffsetDateTime::now_utc().unix_timestamp() + 10000,
     };
-    let token = encode(
-        &Header::new(Algorithm::ES384),
-        &my_claims,
-        &EncodingKey::from_ec_pem(privkey_pem).unwrap(),
-    )
-    .unwrap();
-    let token_data = decode::<Claims>(
+    let header = Header::new(Algorithm::ES384);
+    let signing_provider =
+        jwt_signer_factory(&header.alg, &EncodingKey::from_ec_pem(privkey_pem).unwrap()).unwrap();
+    let mut token = String::new();
+    encode(&signing_provider, &header, &my_claims, &mut token).unwrap();
+
+    let header: Header = decode_header(token.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_ec_pem(pubkey_pem).unwrap()).unwrap();
+    let token_data = decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &token,
-        &DecodingKey::from_ec_pem(pubkey_pem).unwrap(),
         &Validation::new(Algorithm::ES384),
     )
     .unwrap();

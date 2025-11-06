@@ -6,6 +6,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 use jsonwebtoken::{
     Algorithm, DecodingKey, EncodingKey,
     crypto::{sign, verify},
+    decode_header, jwt_signer_factory, jwt_verifier_factory,
 };
 #[cfg(feature = "use_pem")]
 use jsonwebtoken::{Header, Validation, decode, encode};
@@ -35,8 +36,10 @@ fn round_trip_sign_verification_pem_pkcs1() {
     let certificate_pem = include_bytes!("certificate_rsa_key_pkcs1.crt");
 
     for &alg in RSA_ALGORITHMS {
-        let encrypted =
-            sign(b"hello world", &EncodingKey::from_rsa_pem(privkey_pem).unwrap(), alg).unwrap();
+        let provider =
+            jwt_signer_factory(&alg, &EncodingKey::from_rsa_pem(privkey_pem).unwrap()).unwrap();
+        let mut encrypted = String::new();
+        sign(&provider, b"hello world", &mut encrypted).unwrap();
 
         let is_valid = verify(
             &encrypted,
@@ -67,8 +70,10 @@ fn round_trip_sign_verification_pem_pkcs8() {
     let certificate_pem = include_bytes!("certificate_rsa_key_pkcs8.crt");
 
     for &alg in RSA_ALGORITHMS {
-        let encrypted =
-            sign(b"hello world", &EncodingKey::from_rsa_pem(privkey_pem).unwrap(), alg).unwrap();
+        let provider =
+            jwt_signer_factory(&alg, &EncodingKey::from_rsa_pem(privkey_pem).unwrap()).unwrap();
+        let mut encrypted = String::new();
+        sign(&provider, b"hello world", &mut encrypted).unwrap();
 
         let is_valid = verify(
             &encrypted,
@@ -97,7 +102,9 @@ fn round_trip_sign_verification_der() {
     let pubkey_der = include_bytes!("public_rsa_key.der");
 
     for &alg in RSA_ALGORITHMS {
-        let encrypted = sign(b"hello world", &EncodingKey::from_rsa_der(privkey_der), alg).unwrap();
+        let provider = jwt_signer_factory(&alg, &EncodingKey::from_rsa_der(privkey_der)).unwrap();
+        let mut encrypted = String::new();
+        sign(&provider, b"hello world", &mut encrypted).unwrap();
         let is_valid =
             verify(&encrypted, b"hello world", &DecodingKey::from_rsa_der(pubkey_der), alg)
                 .unwrap();
@@ -119,24 +126,28 @@ fn round_trip_claim() {
     let certificate_pem = include_bytes!("certificate_rsa_key_pkcs1.crt");
 
     for &alg in RSA_ALGORITHMS {
-        let token =
-            encode(&Header::new(alg), &my_claims, &EncodingKey::from_rsa_pem(privkey_pem).unwrap())
+        let header = Header::new(alg);
+        let signing_provider =
+            jwt_signer_factory(&header.alg, &EncodingKey::from_rsa_pem(privkey_pem).unwrap())
                 .unwrap();
-        let token_data = decode::<Claims>(
-            &token,
-            &DecodingKey::from_rsa_pem(pubkey_pem).unwrap(),
-            &Validation::new(alg),
-        )
-        .unwrap();
+        let mut token = String::new();
+        encode(&signing_provider, &header, &my_claims, &mut token).unwrap();
+        let header: Header = decode_header(token.as_str()).unwrap();
+        let decoding_provider =
+            jwt_verifier_factory(&header.alg, &DecodingKey::from_rsa_pem(pubkey_pem).unwrap())
+                .unwrap();
+        let token_data =
+            decode::<Claims, Header>(&decoding_provider, &header.alg, &token, &Validation::new(alg))
+                .unwrap();
         assert_eq!(my_claims, token_data.claims);
         assert!(token_data.header.kid.is_none());
 
-        let cert_token_data = decode::<Claims>(
-            &token,
-            &DecodingKey::from_rsa_pem(certificate_pem).unwrap(),
-            &Validation::new(alg),
-        )
-        .unwrap();
+        let decoding_provider =
+            jwt_verifier_factory(&header.alg, &DecodingKey::from_rsa_pem(certificate_pem).unwrap())
+                .unwrap();
+        let cert_token_data =
+            decode::<Claims, Header>(&decoding_provider, &header.alg, &token, &Validation::new(alg))
+                .unwrap();
         assert_eq!(my_claims, cert_token_data.claims);
         assert!(cert_token_data.header.kid.is_none());
     }
@@ -155,15 +166,20 @@ fn rsa_modulus_exponent() {
     let n = "yRE6rHuNR0QbHO3H3Kt2pOKGVhQqGZXInOduQNxXzuKlvQTLUTv4l4sggh5_CYYi_cvI-SXVT9kPWSKXxJXBXd_4LkvcPuUakBoAkfh-eiFVMh2VrUyWyj3MFl0HTVF9KwRXLAcwkREiS3npThHRyIxuy0ZMeZfxVL5arMhw1SRELB8HoGfG_AtH89BIE9jDBHZ9dLelK9a184zAf8LwoPLxvJb3Il5nncqPcSfKDDodMFBIMc4lQzDKL5gvmiXLXB1AGLm8KBjfE8s3L5xqi-yUod-j8MtvIj812dkS4QMiRVN_by2h3ZY8LYVGrqZXZTcgn2ujn8uKjXLZVD5TdQ";
     let e = "AQAB";
 
-    let encrypted = encode(
-        &Header::new(Algorithm::RS256),
-        &my_claims,
-        &EncodingKey::from_rsa_pem(privkey.as_ref()).unwrap(),
-    )
-    .unwrap();
-    let res = decode::<Claims>(
+    let header = Header::new(Algorithm::RS256);
+    let signing_provider =
+        jwt_signer_factory(&header.alg, &EncodingKey::from_rsa_pem(privkey.as_ref()).unwrap())
+            .unwrap();
+    let mut encrypted = String::new();
+    encode(&signing_provider, &header, &my_claims, &mut encrypted).unwrap();
+    let header: Header = decode_header(encrypted.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_rsa_components(n, e).unwrap())
+            .unwrap();
+    let res = decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &encrypted,
-        &DecodingKey::from_rsa_components(n, e).unwrap(),
         &Validation::new(Algorithm::RS256),
     );
     assert!(res.is_ok());
@@ -191,15 +207,19 @@ fn rsa_jwk() {
         "use": "sig"
     })).unwrap();
 
-    let encrypted = encode(
-        &Header::new(Algorithm::RS256),
-        &my_claims,
-        &EncodingKey::from_rsa_pem(privkey.as_ref()).unwrap(),
-    )
-    .unwrap();
-    let res = decode::<Claims>(
+    let header = Header::new(Algorithm::RS256);
+    let signing_provider =
+        jwt_signer_factory(&header.alg, &EncodingKey::from_rsa_pem(privkey.as_ref()).unwrap())
+            .unwrap();
+    let mut encrypted = String::new();
+    encode(&signing_provider, &header, &my_claims, &mut encrypted).unwrap();
+    let header: Header = decode_header(encrypted.as_str()).unwrap();
+    let decoding_provider =
+        jwt_verifier_factory(&header.alg, &DecodingKey::from_jwk(&jwk).unwrap()).unwrap();
+    let res = decode::<Claims, Header>(
+        &decoding_provider,
+        &header.alg,
         &encrypted,
-        &DecodingKey::from_jwk(&jwk).unwrap(),
         &Validation::new(Algorithm::RS256),
     );
     assert!(res.is_ok());
@@ -221,24 +241,28 @@ fn roundtrip_with_jwtio_example_jey() {
     };
 
     for &alg in RSA_ALGORITHMS {
-        let token =
-            encode(&Header::new(alg), &my_claims, &EncodingKey::from_rsa_pem(privkey_pem).unwrap())
+        let header = Header::new(alg);
+        let signing_provider =
+            jwt_signer_factory(&header.alg, &EncodingKey::from_rsa_pem(privkey_pem).unwrap())
                 .unwrap();
+        let mut token = String::new();
+        encode(&signing_provider, &header, &my_claims, &mut token).unwrap();
 
-        let token_data = decode::<Claims>(
-            &token,
-            &DecodingKey::from_rsa_pem(pubkey_pem).unwrap(),
-            &Validation::new(alg),
-        )
-        .unwrap();
+        let header: Header = decode_header(token.as_str()).unwrap();
+        let decoding_provider =
+            jwt_verifier_factory(&header.alg, &DecodingKey::from_rsa_pem(pubkey_pem).unwrap())
+                .unwrap();
+        let token_data =
+            decode::<Claims, Header>(&decoding_provider, &header.alg, &token, &Validation::new(alg))
+                .unwrap();
         assert_eq!(my_claims, token_data.claims);
 
-        let cert_token_data = decode::<Claims>(
-            &token,
-            &DecodingKey::from_rsa_pem(certificate_pem).unwrap(),
-            &Validation::new(alg),
-        )
-        .unwrap();
+        let decoding_provider =
+            jwt_verifier_factory(&header.alg, &DecodingKey::from_rsa_pem(certificate_pem).unwrap())
+                .unwrap();
+        let cert_token_data =
+            decode::<Claims, Header>(&decoding_provider, &header.alg, &token, &Validation::new(alg))
+                .unwrap();
         assert_eq!(my_claims, cert_token_data.claims);
     }
 }

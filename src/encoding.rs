@@ -10,14 +10,12 @@ use base64::{
 };
 use serde::ser::Serialize;
 
-use crate::Algorithm;
 use crate::algorithms::AlgorithmFamily;
-use crate::crypto::JwtSigner;
 use crate::errors::{ErrorKind, Result, new_error};
-use crate::header::Header;
 #[cfg(feature = "use_pem")]
 use crate::pem::decoder::PemEncodedKey;
 use crate::serialization::{b64_encode, b64_encode_part};
+use crate::{Algorithm, BaseHeader};
 // Crypto
 #[cfg(feature = "aws_lc_rs")]
 use crate::crypto::aws_lc::{
@@ -28,6 +26,7 @@ use crate::crypto::aws_lc::{
         Rsa256Signer, Rsa384Signer, Rsa512Signer, RsaPss256Signer, RsaPss384Signer, RsaPss512Signer,
     },
 };
+use crate::crypto::rust_crypto::SignerAlgorithm;
 #[cfg(feature = "rust_crypto")]
 use crate::crypto::rust_crypto::{
     ecdsa::{Es256Signer, Es384Signer},
@@ -158,7 +157,7 @@ impl Debug for EncodingKey {
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
-/// use jsonwebtoken::{encode, Algorithm, Header, EncodingKey};
+/// use jsonwebtoken::{encode, Algorithm, Header, EncodingKey, jwt_signer_factory};
 ///
 /// #[derive(Debug, Serialize, Deserialize)]
 /// struct Claims {
@@ -173,46 +172,53 @@ impl Debug for EncodingKey {
 ///
 /// // my_claims is a struct that implements Serialize
 /// // This will create a JWT using HS256 as algorithm
-/// let token = encode(&Header::default(), &my_claims, &EncodingKey::from_secret("secret".as_ref())).unwrap();
+/// let header = Header::default();
+/// let signing_provider = jwt_signer_factory(&header.alg, &EncodingKey::from_secret("secret".as_ref())).unwrap();
+/// let mut token = String::new();
+/// encode(&signing_provider, &Header::default(), &my_claims, &mut token).unwrap();
 /// ```
-pub fn encode<T: Serialize>(header: &Header, claims: &T, key: &EncodingKey) -> Result<String> {
-    if key.family != header.alg.family() {
+pub fn encode<T: Serialize, H: BaseHeader + Serialize>(
+    signing_provider: &SignerAlgorithm,
+    header: &H,
+    claims: &T,
+    data: &mut String,
+) -> Result<()> {
+    if signing_provider.algorithm() != header.algorithm() {
         return Err(new_error(ErrorKind::InvalidAlgorithm));
     }
 
-    let signing_provider = jwt_signer_factory(&header.alg, key)?;
+    b64_encode_part(&header, data)?;
+    data.push('.');
+    b64_encode_part(claims, data)?;
 
-    if signing_provider.algorithm() != header.alg {
-        return Err(new_error(ErrorKind::InvalidAlgorithm));
-    }
+    let signature = signing_provider.sign(data.as_bytes());
+    data.push('.');
+    b64_encode(&signature, data);
 
-    let encoded_header = b64_encode_part(&header)?;
-    let encoded_claims = b64_encode_part(claims)?;
-    let message = [encoded_header, encoded_claims].join(".");
-
-    let signature = b64_encode(signing_provider.sign(message.as_bytes()));
-
-    Ok([message, signature].join("."))
+    Ok(())
 }
 
 /// Return the correct [`JwtSigner`] based on the `algorithm`.
-pub(crate) fn jwt_signer_factory(
+pub fn jwt_signer_factory(
     algorithm: &Algorithm,
     key: &EncodingKey,
-) -> Result<Box<dyn JwtSigner>> {
+) -> Result<Box<SignerAlgorithm>> {
+    if key.family != algorithm.family() {
+        return Err(new_error(ErrorKind::InvalidAlgorithm));
+    }
     let jwt_signer = match algorithm {
-        Algorithm::HS256 => Box::new(Hs256Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::HS384 => Box::new(Hs384Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::HS512 => Box::new(Hs512Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::ES256 => Box::new(Es256Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::ES384 => Box::new(Es384Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::RS256 => Box::new(Rsa256Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::RS384 => Box::new(Rsa384Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::RS512 => Box::new(Rsa512Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::PS256 => Box::new(RsaPss256Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::PS384 => Box::new(RsaPss384Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::PS512 => Box::new(RsaPss512Signer::new(key)?) as Box<dyn JwtSigner>,
-        Algorithm::EdDSA => Box::new(EdDSASigner::new(key)?) as Box<dyn JwtSigner>,
+        Algorithm::HS256 => Box::new(SignerAlgorithm::HS256(Hs256Signer::new(key)?)),
+        Algorithm::HS384 => Box::new(SignerAlgorithm::HS384(Hs384Signer::new(key)?)),
+        Algorithm::HS512 => Box::new(SignerAlgorithm::HS512(Hs512Signer::new(key)?)),
+        Algorithm::ES256 => Box::new(SignerAlgorithm::ES256(Es256Signer::new(key)?)),
+        Algorithm::ES384 => Box::new(SignerAlgorithm::ES384(Es384Signer::new(key)?)),
+        Algorithm::RS256 => Box::new(SignerAlgorithm::RS256(Rsa256Signer::new(key)?)),
+        Algorithm::RS384 => Box::new(SignerAlgorithm::RS384(Rsa384Signer::new(key)?)),
+        Algorithm::RS512 => Box::new(SignerAlgorithm::RS512(Rsa512Signer::new(key)?)),
+        Algorithm::PS256 => Box::new(SignerAlgorithm::PS256(RsaPss256Signer::new(key)?)),
+        Algorithm::PS384 => Box::new(SignerAlgorithm::PS384(RsaPss384Signer::new(key)?)),
+        Algorithm::PS512 => Box::new(SignerAlgorithm::PS512(RsaPss512Signer::new(key)?)),
+        Algorithm::EdDSA => Box::new(SignerAlgorithm::EdDSA(EdDSASigner::new(key)?)),
     };
 
     Ok(jwt_signer)

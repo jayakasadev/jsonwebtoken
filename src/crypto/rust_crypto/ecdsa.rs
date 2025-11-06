@@ -2,11 +2,11 @@
 //! ECDSA family of algorithms using RustCrypto
 
 extern crate alloc;
-use alloc::vec::Vec;
 use crate::algorithms::AlgorithmFamily;
 use crate::crypto::{JwtSigner, JwtVerifier};
 use crate::errors::{ErrorKind, Result, new_error};
 use crate::{Algorithm, DecodingKey, EncodingKey};
+use alloc::vec::Vec;
 use p256::ecdsa::{
     Signature as Signature256, SigningKey as SigningKey256, VerifyingKey as VerifyingKey256,
 };
@@ -18,6 +18,7 @@ use signature::{Error, Signer, Verifier};
 
 macro_rules! define_ecdsa_signer {
     ($name:ident, $alg:expr, $signing_key:ty) => {
+        #[derive(Debug)]
         pub struct $name($signing_key);
 
         impl $name {
@@ -50,6 +51,7 @@ macro_rules! define_ecdsa_signer {
 
 macro_rules! define_ecdsa_verifier {
     ($name:ident, $alg:expr, $verifying_key:ty, $signature:ty) => {
+        #[derive(Debug)]
         pub struct $name($verifying_key);
 
         impl $name {

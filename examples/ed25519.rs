@@ -4,7 +4,8 @@ use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
 use jsonwebtoken::{
-    Algorithm, DecodingKey, EncodingKey, Validation, decode, encode, get_current_timestamp,
+    Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, decode_header, encode,
+    get_current_timestamp, jwt_signer_factory, jwt_verifier_factory,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -27,12 +28,16 @@ fn main() {
     let decoding_key = DecodingKey::from_ed_der(public_key);
 
     let claims = Claims { sub: "test".to_string(), exp: get_current_timestamp() };
-
-    let token =
-        encode(&jsonwebtoken::Header::new(Algorithm::EdDSA), &claims, &encoding_key).unwrap();
+    let header = Header::new(Algorithm::EdDSA);
+    let signing_provider = jwt_signer_factory(&header.alg, &encoding_key).unwrap();
+    let mut token = String::new();
+    encode(&signing_provider, &header, &claims, &mut token).unwrap();
 
     let validation = Validation::new(Algorithm::EdDSA);
-    let _token_data = decode::<Claims>(&token, &decoding_key, &validation).unwrap();
+    let header: Header = decode_header(token.as_str()).unwrap();
+    let decoding_provider = jwt_verifier_factory(&header.alg, &decoding_key).unwrap();
+    let _token_data =
+        decode::<Claims, Header>(&decoding_provider, &header.alg, &token, &validation).unwrap();
 }
 
 #[cfg(test)]
@@ -65,13 +70,17 @@ mod tests {
     fn test() {
         let jot = Jot::new();
         let claims = Claims { sub: "test".to_string(), exp: get_current_timestamp() };
+        let header = Header::new(Algorithm::EdDSA);
+        let signing_provider = jwt_signer_factory(&header.alg, &jot.encoding_key).unwrap();
 
-        let token =
-            encode(&jsonwebtoken::Header::new(Algorithm::EdDSA), &claims, &jot.encoding_key)
-                .unwrap();
+        let mut token = String::new();
+        encode(&signing_provider, &header, &claims, &mut token).unwrap();
 
         let validation = Validation::new(Algorithm::EdDSA);
-        let token_data = decode::<Claims>(&token, &jot.decoding_key, &validation).unwrap();
+        let header: Header = decode_header(token.as_str()).unwrap();
+        let decoding_provider = jwt_verifier_factory(&header.alg, &jot.decoding_key).unwrap();
+        let token_data =
+            decode::<Claims, Header>(&decoding_provider, &header.alg, &token, &validation).unwrap();
         assert_eq!(token_data.claims.sub, "test");
     }
 }

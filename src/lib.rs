@@ -16,9 +16,10 @@ compile_error!(
 compile_error!("at least one of the features \"rust_crypto\" or \"aws_lc_rs\" must be enabled");
 
 pub use algorithms::Algorithm;
-pub use decoding::{DecodingKey, TokenData, decode, decode_header};
-pub use encoding::{EncodingKey, encode};
-pub use header::Header;
+pub use crypto::{SignerAlgorithm, VerifierAlgorithm};
+pub use decoding::{DecodingKey, TokenData, decode, decode_header, jwt_verifier_factory};
+pub use encoding::{EncodingKey, encode, jwt_signer_factory};
+pub use header::{BaseHeader, Header};
 pub use validation::{Validation, get_current_timestamp};
 
 /// Dangerous decoding functions that should be audited and used with extreme care.

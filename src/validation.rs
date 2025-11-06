@@ -1,9 +1,9 @@
 extern crate alloc;
 use alloc::borrow::{Cow, ToOwned};
+use alloc::collections::BTreeSet;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::collections::BTreeSet;
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -394,8 +394,8 @@ where
 mod tests {
     extern crate alloc;
     use alloc::borrow::ToOwned;
-    use alloc::string::ToString;
     use alloc::collections::BTreeSet;
+    use alloc::string::ToString;
 
     use serde_json::json;
     use wasm_bindgen_test::wasm_bindgen_test;

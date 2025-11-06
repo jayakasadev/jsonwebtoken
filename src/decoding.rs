@@ -8,9 +8,8 @@ use serde::de::DeserializeOwned;
 
 use crate::Algorithm;
 use crate::algorithms::AlgorithmFamily;
-use crate::crypto::JwtVerifier;
 use crate::errors::{ErrorKind, Result, new_error};
-use crate::header::Header;
+use crate::header::BaseHeader;
 use crate::jwk::{AlgorithmParameters, Jwk};
 #[cfg(feature = "use_pem")]
 use crate::pem::decoder::PemEncodedKey;
@@ -27,6 +26,7 @@ use crate::crypto::aws_lc::{
         RsaPss512Verifier,
     },
 };
+use crate::crypto::rust_crypto::VerifierAlgorithm;
 #[cfg(feature = "rust_crypto")]
 use crate::crypto::rust_crypto::{
     ecdsa::{Es256Verifier, Es384Verifier},
@@ -40,14 +40,14 @@ use crate::crypto::rust_crypto::{
 
 /// The return type of a successful call to [decode](fn.decode.html).
 #[derive(Debug)]
-pub struct TokenData<T> {
+pub struct TokenData<T, H: BaseHeader> {
     /// The decoded JWT header
-    pub header: Header,
+    pub header: H,
     /// The decoded JWT claims
     pub claims: T,
 }
 
-impl<T> Clone for TokenData<T>
+impl<T, H: BaseHeader + Clone> Clone for TokenData<T, H>
 where
     T: Clone,
 {
@@ -268,7 +268,7 @@ impl TryFrom<&Jwk> for DecodingKey {
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
-/// use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+/// use jsonwebtoken::{decode, jwt_verifier_factory, decode_header, DecodingKey, Validation, Algorithm, Header};
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize)]
 /// struct Claims {
@@ -276,25 +276,25 @@ impl TryFrom<&Jwk> for DecodingKey {
 ///    company: String
 /// }
 ///
-/// let token = "a.jwt.token".to_string();
+/// let token = "a.jwt.token";
 /// // Claims is a struct that implements Deserialize
-/// let token_message = decode::<Claims>(&token, &DecodingKey::from_secret("secret".as_ref()), &Validation::new(Algorithm::HS256));
+///  let decoding_provider = jwt_verifier_factory(&Algorithm::HS256, &DecodingKey::from_secret("secret".as_ref())).unwrap();
+///  let token_message = decode::<Claims, Header>(&decoding_provider, &Algorithm::HS256, &token, &Validation::new(Algorithm::HS256));
+///
 /// ```
-pub fn decode<T: DeserializeOwned>(
+pub fn decode<T: DeserializeOwned, H: BaseHeader>(
+    verifying_provider: &VerifierAlgorithm,
+    alg: &Algorithm,
     token: impl AsRef<[u8]>,
-    key: &DecodingKey,
     validation: &Validation,
-) -> Result<TokenData<T>> {
+) -> Result<TokenData<T, H>> {
     let token = token.as_ref();
-    let header = decode_header(token)?;
 
-    if validation.validate_signature && !validation.algorithms.contains(&header.alg) {
+    if validation.validate_signature && !validation.algorithms.contains(&alg) {
         return Err(new_error(ErrorKind::InvalidAlgorithm));
     }
 
-    let verifying_provider = jwt_verifier_factory(&header.alg, key)?;
-
-    let (header, claims) = verify_signature(token, validation, verifying_provider)?;
+    let (header, claims) = verify_signature::<H>(token, validation, verifying_provider)?;
 
     let decoded_claims = DecodedJwtPartClaims::from_jwt_part_claims(claims)?;
     let claims = decoded_claims.deserialize()?;
@@ -306,13 +306,15 @@ pub fn decode<T: DeserializeOwned>(
 /// Decode a JWT with NO VALIDATION
 ///
 /// DANGER: This performs zero validation on the JWT
-pub fn insecure_decode<T: DeserializeOwned>(token: impl AsRef<[u8]>) -> Result<TokenData<T>> {
+pub fn insecure_decode<T: DeserializeOwned, H: BaseHeader>(
+    token: impl AsRef<[u8]>,
+) -> Result<TokenData<T, H>> {
     let token = token.as_ref();
 
     let (_, message) = expect_two!(token.rsplitn(2, |b| *b == b'.'));
     let (payload, header) = expect_two!(message.rsplitn(2, |b| *b == b'.'));
 
-    let header = Header::from_encoded(header)?;
+    let header = H::from_encoded(header)?;
     let claims = DecodedJwtPartClaims::from_jwt_part_claims(payload)?.deserialize()?;
 
     Ok(TokenData { header, claims })
@@ -322,20 +324,20 @@ pub fn insecure_decode<T: DeserializeOwned>(token: impl AsRef<[u8]>) -> Result<T
 pub fn jwt_verifier_factory(
     algorithm: &Algorithm,
     key: &DecodingKey,
-) -> Result<Box<dyn JwtVerifier>> {
+) -> Result<Box<VerifierAlgorithm>> {
     let jwt_encoder = match algorithm {
-        Algorithm::HS256 => Box::new(Hs256Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::HS384 => Box::new(Hs384Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::HS512 => Box::new(Hs512Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::ES256 => Box::new(Es256Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::ES384 => Box::new(Es384Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::RS256 => Box::new(Rsa256Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::RS384 => Box::new(Rsa384Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::RS512 => Box::new(Rsa512Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::PS256 => Box::new(RsaPss256Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::PS384 => Box::new(RsaPss384Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::PS512 => Box::new(RsaPss512Verifier::new(key)?) as Box<dyn JwtVerifier>,
-        Algorithm::EdDSA => Box::new(EdDSAVerifier::new(key)?) as Box<dyn JwtVerifier>,
+        Algorithm::HS256 => Box::new(VerifierAlgorithm::HS256(Hs256Verifier::new(key)?)),
+        Algorithm::HS384 => Box::new(VerifierAlgorithm::HS384(Hs384Verifier::new(key)?)),
+        Algorithm::HS512 => Box::new(VerifierAlgorithm::HS512(Hs512Verifier::new(key)?)),
+        Algorithm::ES256 => Box::new(VerifierAlgorithm::ES256(Es256Verifier::new(key)?)),
+        Algorithm::ES384 => Box::new(VerifierAlgorithm::ES384(Es384Verifier::new(key)?)),
+        Algorithm::RS256 => Box::new(VerifierAlgorithm::RS256(Rsa256Verifier::new(key)?)),
+        Algorithm::RS384 => Box::new(VerifierAlgorithm::RS384(Rsa384Verifier::new(key)?)),
+        Algorithm::RS512 => Box::new(VerifierAlgorithm::RS512(Rsa512Verifier::new(key)?)),
+        Algorithm::PS256 => Box::new(VerifierAlgorithm::PS256(RsaPss256Verifier::new(key)?)),
+        Algorithm::PS384 => Box::new(VerifierAlgorithm::PS384(RsaPss384Verifier::new(key)?)),
+        Algorithm::PS512 => Box::new(VerifierAlgorithm::PS512(RsaPss512Verifier::new(key)?)),
+        Algorithm::EdDSA => Box::new(VerifierAlgorithm::EdDSA(EdDSAVerifier::new(key)?)),
     };
 
     Ok(jwt_encoder)
@@ -346,24 +348,24 @@ pub fn jwt_verifier_factory(
 /// If the token has an invalid format (ie 3 parts separated by a `.`), it will return an error.
 ///
 /// ```rust
-/// use jsonwebtoken::decode_header;
+/// use jsonwebtoken::{decode_header, Header};
 ///
 /// let token = "a.jwt.token".to_string();
-/// let header = decode_header(&token);
+/// let header = decode_header::<Header>(&token);
 /// ```
-pub fn decode_header(token: impl AsRef<[u8]>) -> Result<Header> {
+pub fn decode_header<H: BaseHeader>(token: impl AsRef<[u8]>) -> Result<H> {
     let token = token.as_ref();
     let (_, message) = expect_two!(token.rsplitn(2, |b| *b == b'.'));
     let (_, header) = expect_two!(message.rsplitn(2, |b| *b == b'.'));
-    Header::from_encoded(header)
+    H::from_encoded(header)
 }
 
-pub(crate) fn verify_signature_body(
+pub(crate) fn verify_signature_body<H: BaseHeader>(
     message: &[u8],
     signature: &[u8],
-    header: &Header,
+    header: &H,
     validation: &Validation,
-    verifying_provider: Box<dyn JwtVerifier>,
+    verifying_provider: &VerifierAlgorithm,
 ) -> Result<()> {
     if validation.validate_signature && validation.algorithms.is_empty() {
         return Err(new_error(ErrorKind::MissingAlgorithm));
@@ -377,7 +379,7 @@ pub(crate) fn verify_signature_body(
         }
     }
 
-    if validation.validate_signature && !validation.algorithms.contains(&header.alg) {
+    if validation.validate_signature && !validation.algorithms.contains(&header.algorithm()) {
         return Err(new_error(ErrorKind::InvalidAlgorithm));
     }
 
@@ -393,14 +395,14 @@ pub(crate) fn verify_signature_body(
 /// Verify the signature of a JWT, and return a header object and raw payload.
 ///
 /// If the token or its signature is invalid, it will return an error.
-fn verify_signature<'a>(
+fn verify_signature<'a, H: BaseHeader>(
     token: &'a [u8],
     validation: &Validation,
-    verifying_provider: Box<dyn JwtVerifier>,
-) -> Result<(Header, &'a [u8])> {
+    verifying_provider: &VerifierAlgorithm,
+) -> Result<(H, &'a [u8])> {
     let (signature, message) = expect_two!(token.rsplitn(2, |b| *b == b'.'));
     let (payload, header) = expect_two!(message.rsplitn(2, |b| *b == b'.'));
-    let header = Header::from_encoded(header)?;
+    let header = H::from_encoded(header)?;
     verify_signature_body(message, signature, &header, validation, verifying_provider)?;
 
     Ok((header, payload))
